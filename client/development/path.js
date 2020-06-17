@@ -68,6 +68,13 @@ var Pathfinder = class {
         if (this.zombieType == "sprinter") this.maxIdleTicks = 10;
     }
     /*
+        Render Pathfinder logic
+
+    */
+    render() {
+
+    }
+    /*
         Is from-to LOS Clear
     */
     isValid(from, to) {
@@ -106,7 +113,7 @@ var Pathfinder = class {
                 return 0;
             })
             if (loudest[0]) {
-                targetPosition = this.getNearest(this.position, loudest[0].position)
+                targetPosition = this.getNearest(this.position.add(0,0,1), loudest[0].position)
             }
         }
         return targetPosition;

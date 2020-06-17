@@ -114,7 +114,6 @@ function getIsHitOnBone(hitPosition, target) {
         dist: nearest_bone_dist
     };
 }
-
 /*
     Draw Debug stuff
 */
@@ -142,8 +141,6 @@ void AddDecal(Vector3 pos, DecalTypes decalType, float width = 1.0f, float heigh
 */
 //mp.game.graphics.addDecal(decaltype, x, y, z, dirX, dirY, dirZ, p8,p9, p10, width, height, rCoef, gCoef, bCoef, opacity, timeout, 0, 0, 0);
 //mp.game.graphics.addDecal(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19);
-
-
 /*
     sorta shot sync, because you cant set peds attackable and have serverside synced hp
 
@@ -154,7 +151,18 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
         let hand_pos = mp.players.local.getBoneCoords(57005, 0, 0, 0);
         // let raycast = mp.raycasting.testPointToPoint(hand_pos, targetPosition, mp.players.local, (4 | 8));
         let raycast = mp.raycasting.testCapsule(hand_pos, targetPosition, 0.3, mp.players.local, (4 | 8 | 1 | 2 | 16))
-        // if (raycast && raycast.surfaceNormal) mp.game.graphics.addDecal(1110 /*splatters_blood2 */ , targetPosition.x, targetPosition.y, targetPosition.z, 0 /*dirX*/ , 0 /*dirY*/ , -1 /*dirZ*/ , 0, /*rot*/1, 0, 4 /*width*/ , 4 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+        if (raycast && raycast.surfaceNormal) {
+            //mp.game.graphics.addDecal(1110 /*splatters_blood2 */ , targetPosition.x, targetPosition.y, targetPosition.z, 0 /*dirX*/ , 0 /*dirY*/ , -1 /*dirZ*/ , 0, /*rot*/ 1, 0, 4 /*width*/ , 4 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ ,1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , -1 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ ,1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , 1 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ , 1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ , 1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , -1 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ , 1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 1 /*dirY*/ ,0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ , 1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ , 1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, -1 /*dirX*/ , 0 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ , 1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+            mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 1 /*dirX*/ , 0 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ , 1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
+        }
         // if (raycast && raycast.surfaceNormal) mp.game.graphics.addDecal(1110 /*splatters_blood2 */ , raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , -1 /*dirZ*/ , 0, /*rot*/1, 0, 4 /*width*/ , 4 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
         if (raycast && raycast.entity) {
             //console.log("raycast", raycast)
@@ -187,7 +195,6 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
         console.log("targetEntity.remoteid", targetEntity.remoteid)
     }
 });
-
 /*
     Hitmarker 
 */
