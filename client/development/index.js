@@ -1,4 +1,7 @@
-mp.game.audio.startAudioScene("FBI_HEIST_H5_MUTE_AMBIENCE_SCENE");
+require("./libs/attachmentSync.js")
+require("./libs/weapon_attachments.js")
+var Bones = require("./libs/skeleton.js")
+require("./attachments.js")
 console.log = function(...a) {
     a = a.map(function(e) {
         return JSON.stringify(e);
@@ -7,7 +10,6 @@ console.log = function(...a) {
 };
 mp.nametags.enabled = true;
 
-
 /*
     Client Tickrate
 */
@@ -15,10 +17,6 @@ var tickRate = 1000 / 5;
 setInterval(function() {
     mp.events.call("client:Tick");
 }, tickRate);
-
-
-
-
 /*
     enum Flags 
 */
@@ -45,19 +43,19 @@ Object.keys(flags).forEach(function(key, value) {
 mp.lerp = (a, b, n) => {
     return (1 - n) * a + n * b;
 }
+/*
+    shortcut for validating
+*/
+mp.isValid = function(val) {
+    return val != null && val != undefined && val != "";
+}
 mp.gui.chat.activate(true)
 mp.isCrouched = false;
 require("./vector.js")
 require("./sync.js")
 require("./combat.js")
 require("./movement.js")
-
-
-
-
-
-
-
+require("./weather.js")
 
 
 /*
@@ -67,7 +65,6 @@ var stats = ["SP0_STAMINA", "SP0_SHOOTING_ABILITY", "SP0_STRENGTH", "SP0_STEALTH
 stats.forEach((element) => {
     mp.game.stats.statSetInt(mp.game.joaat(element), 100, false);
 });
-
 /*
     Update player Noise
 */
@@ -92,12 +89,20 @@ var localPlayerBlip = mp.blips.new(9, new mp.Vector3(0, 0, 0), {
     alpha: 100,
     drawDistance: 0
 });
-
-
-
-
-
 mp.events.add("render", () => {
+    //if (!mp.players.local.isPlayingAnim("move_crawl", "onfront_fwd", 3)) {
+    //    mp.players.local.taskPlayAnim("move_crawl", "onfront_fwd", 8.0, 1.0, -1, 9, 0.0, false, false, false);
+    //    mp.players.local.taskPlayAnim("move_crawl", "onfront_fwd", 8.0, 1.0, -1, 43, 0.0, false, false, false);
+    //}
+
+
+    //mp.players.local.taskAimGunScripted(mp.game.gameplay.getHashKey("SCRIPTED_GUN_TASK_PLANE_WING"), true, true);
+
+
+
+
+
+
     let mul = mp.players.local.getVariable("isCrouched");
     let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.8 : mp.game.player.getCurrentStealthNoise();
     if (mp.players.local.isInAnyVehicle(false)) {
@@ -126,7 +131,6 @@ mp.events.add("render", () => {
         // mp.players.local.clearLastDamage();
     }
 });
-
 /*
     test zombie spawning
 */

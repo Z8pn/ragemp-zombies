@@ -1,3 +1,4 @@
+var Bones = require("./libs/skeleton.js")
 var debug = true
 var Pathfinder = require("./path.js");
 var natives = require("./natives.js");
@@ -36,7 +37,6 @@ var SyncWorld = new class {
         }
     }
 }
-
 /*
     Basic Ped Sync Class (extended for other modules)
     includes basic tick event and destroy class.
@@ -47,8 +47,7 @@ class SyncPed {
         this._ped = mp.peds.atRemoteId(this._remote_id);
         console.log("got SyncPed", this._remote_id, this._ped)
         console.log("sync_id", this._ped.getVariable('sync_id'))
-
-         this.ticker = new mp.Event("client:Tick", () => {
+        this.ticker = new mp.Event("client:Tick", () => {
             this.tick();
         });
     }
@@ -67,7 +66,6 @@ class SyncPed {
         console.log("default tick");
     }
 }
-
 /*
     Extended SyncPed class for Zombie AI
     @TODO add arguments for noiseAlertness, viewDistance for different zombieTypes
@@ -105,6 +103,16 @@ class Zombie extends SyncPed {
         if (this._ped.isRagdoll()) this.flag = Flags.RAGDOLL;
         if ((this.flag == Flags.RAGDOLL) && (!this._ped.isRagdoll())) {
             this.flag = Flags.IDLE
+            mp.peds.forEachInStreamRange((ped) => {
+                if (!ped.getVariable('zombie')) return;
+                ped.setNoCollision(this._ped.handle, true);
+            })
+        }
+        if ((this.flag == Flags.RAGDOLL)) {
+            mp.peds.forEachInStreamRange((ped) => {
+                if (!ped.getVariable('zombie')) return;
+                ped.setNoCollision(this._ped.handle, false);
+            })
         }
         //if (this._ped.isDeadOrDying(true)) this.flag = Flags.DEAD;
     }
@@ -128,8 +136,8 @@ class Zombie extends SyncPed {
         let r = mp.lerp(200, 0, 1 / this._ped.getMaxHealth() * this._ped.getHealth());
         mp.game.graphics.drawMarker(25, position.x, position.y, position.z + 0.04, 0, 0, 0, 0, 0, 0, 1, 1, 1, r, 0, 0, 150, false, false, 2, false, "", "", false);
         if (this.currentTargetPosition) {
-            mp.game.graphics.drawMarker(28, this.currentTargetPosition.x, this.currentTargetPosition.y, this.currentTargetPosition.z, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0, 255, 0, 255, false, false, 2, false, "", "", false);
-            mp.game.graphics.drawLine(position.x, position.y, position.z+1, this.currentTargetPosition.x, this.currentTargetPosition.y, this.currentTargetPosition.z, 0, 255, 0, 255);
+            mp.game.graphics.drawMarker(28, this.currentTargetPosition.x, this.currentTargetPosition.y, this.currentTargetPosition.z - 0.25, 0, 0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0, 255, 0, 255, false, false, 2, false, "", "", false);
+            mp.game.graphics.drawLine(position.x, position.y, position.z + 1, this.currentTargetPosition.x, this.currentTargetPosition.y, this.currentTargetPosition.z, 0, 255, 0, 255);
         }
     }
     /*
@@ -157,10 +165,17 @@ class Zombie extends SyncPed {
         this._ped.setCanRagdoll(true);
         this._ped.setCanRagdollFromPlayerImpact(false);
         this._ped.setRagdollFlag(0);
-        this._ped.setRandomComponentVariation(false);
-        this._ped.applyDamagePack("Explosion_Med", Math.floor(Math.random() * 100), 1);
+        //this._ped.setRandomComponentVariation(false);
+        this._ped.applyDamagePack("BigHitByVehicle", 100, 1);
+        this._ped.applyDamagePack("Explosion_Med", 100, 1);
+        this._ped.applyDamagePack("Explosion_Large", 100, 1);
+        this._ped.applyDamagePack("SCR_Torture", 100, 1);
+        this._ped.applyDamagePack("SCR_Shark", 100, 1);
+        this._ped.applyDamagePack("BigRunOverByVehicle", 100, 1);
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
         this._ped.setHealth((100 + this._ped.getVariable('HEALTH')));
+        let position = mp.vector(this._ped.getCoords(true))
+        this._ped.taskPlantBomb(position.x, position.y, position.z, this._ped.getHeading());
     }
     /*
         Apply hit to player (make it stumble and so on)
@@ -225,7 +240,7 @@ class Zombie extends SyncPed {
     */
     walk(position) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
-        this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 0.8, 0, false, 786603, 0);
+        this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 1, 0, false, 786603, 0);
         //this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 0.4, 15000, this.newHeading, 0);
     }
     /*
@@ -251,7 +266,7 @@ class Zombie extends SyncPed {
         if (!this.position) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 12.4, 0, false, 786603, 0);
         if (this.position.z > position.z + 1) {
-            this._ped.taskGoStraightToCoord(position.x, position.y, position.z,12.4, -1, this._ped.getHeading(), 2);
+            this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 12.4, -1, this._ped.getHeading(), 2);
         }
     }
     /*
@@ -261,6 +276,9 @@ class Zombie extends SyncPed {
     meele(targetHandle) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.taskPutDirectlyIntoMelee(targetHandle, 0.0, -1.0, 1.0, false);
+        //this._ped.taskPlayAnim("melee@unarmed@streamed_core", "running_punch_no_target", 8.0, 1.0, -1, 1, 1.0, false, false, false);
+        //this._ped.taskPlayAnim("melee@unarmed@streamed_core", "walking_punch_no_target", 32.0, 1.0, -1, 1, 1.0, false, false, false);
+        //this._ped.taskPlayAnim("melee@unarmed@streamed_core", "running_punch_no_target", 8.0, 1.0, -1, 1, 1.0, false, false, false);
     }
     /*
        Initiate Combat
@@ -284,7 +302,7 @@ class Zombie extends SyncPed {
                 this.meele(tagetEntity.handle);
                 return true;
             }
-
+            this.currentTargetPosition = tEntityPos;
             if (this.zombieType == "runner") this.run(tEntityPos);
             if (this.zombieType == "walker") this.walk(tEntityPos);
             if (this.zombieType == "sprinter") this.sprint(tEntityPos);
@@ -346,6 +364,9 @@ class Zombie extends SyncPed {
                         break;
                     }
             }
+            if (this._ped.hasBeenDamagedByAnyObject() || this._ped.hasBeenDamagedByAnyPed() || this._ped.hasBeenDamagedByAnyVehicle()) {
+                console.log("hit")
+            }
         } else {
             this._ped.setHealth(0);
             this._ped.setToRagdoll(1000, 1000, 3, false, false, false);
@@ -375,5 +396,21 @@ mp.events.add('acknowledgeHit', (remote_id, hitData) => {
     let SyncedPed = SyncWorld.getByID(remote_id);
     if (SyncedPed) {
         SyncedPed.applyHit(hitData);
+    }
+});
+/*
+    Test Decals
+*/
+mp.events.add("playerCommand", (command) => {
+    const args = command.split(/[ ]+/);
+    const commandName = args[0];
+    args.shift();
+    if (commandName === "d") {
+        mp.gui.chat.push(`Applying Damagepack [${args.join(",")}]`);
+        mp.players.local.applyDamagePack(args[0], 100, 1);
+    }
+    if (commandName === "c") {
+        mp.gui.chat.push(`Clearing Damagepacks`);
+        mp.players.local.clearBloodDamage();
     }
 });
