@@ -1,0 +1,21 @@
+var PlayerAccount = require("./models/player.js")
+var Peds = require("./models/peds.js")
+mp.events.add("playerDeath", (player) => {
+    player.data.isCrouched = false;
+});
+mp.events.add("toggleCrouch", (player) => {
+    if (player.data.isCrouched === undefined) {
+        player.data.isCrouched = true;
+    } else {
+        player.data.isCrouched = !player.data.isCrouched;
+    }
+});
+mp.events.add("playerJoin", (player) => {
+    //player.dimension = player.id + 1;
+    player.name = player.socialClub;
+    console.log("Player has been connected. (IP: " + player.ip + ") " + player.serial + " SC: " + player.socialClub);
+    player.health = 100;
+    player.model = mp.joaat("mp_m_freemode_01");
+    player.setVariable("movementNoise", 0);
+    player.account = new PlayerAccount(player);
+});
