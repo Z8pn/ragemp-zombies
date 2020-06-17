@@ -76,7 +76,10 @@ var player_bones = {
         threshold: 0.3
     }
 }
-
+/*
+    Calculate if a hit was on bone (regardless of in vehicle or not)
+    @returns object(hit,bone,dist)
+*/
 function getIsHitOnBone(hitPosition, target) {
     let nearest_bone = "";
     let nearest_bone_dist = 99;
@@ -111,6 +114,10 @@ function getIsHitOnBone(hitPosition, target) {
         dist: nearest_bone_dist
     };
 }
+
+/*
+    Draw Debug stuff
+*/
 var impactVectors = [];
 mp.events.add("render", () => {
     impactVectors.forEach((e) => {
@@ -135,6 +142,12 @@ void AddDecal(Vector3 pos, DecalTypes decalType, float width = 1.0f, float heigh
 */
 //mp.game.graphics.addDecal(decaltype, x, y, z, dirX, dirY, dirZ, p8,p9, p10, width, height, rCoef, gCoef, bCoef, opacity, timeout, 0, 0, 0);
 //mp.game.graphics.addDecal(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19);
+
+
+/*
+    sorta shot sync, because you cant set peds attackable and have serverside synced hp
+
+*/
 mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
     let weapon_hash = mp.players.local.weapon;
     if (!targetEntity) {
@@ -174,6 +187,10 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
         console.log("targetEntity.remoteid", targetEntity.remoteid)
     }
 });
+
+/*
+    Hitmarker
+*/
 var timerHitmarker = 0;
 var timerHitmarkerKill = 0;
 var timerEnterDisable = 0;

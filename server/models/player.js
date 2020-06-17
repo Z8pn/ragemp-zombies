@@ -1,3 +1,8 @@
+
+/*
+    Basic player Account class, inherited by every player (player.account)
+*/
+
 var PlayerAccount = class {
     constructor(player) {
         this._player = player;
@@ -14,6 +19,10 @@ var PlayerAccount = class {
     }
     tick() {}
 }
+
+/*
+    Syncs Noise over to other clients so the syncer of NPCs can calculate"
+*/
 mp.events.add("client:noise", (player, noise) => {
 
     player.setVariable("movementNoise",noise);

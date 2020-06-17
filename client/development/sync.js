@@ -36,18 +36,29 @@ var SyncWorld = new class {
         }
     }
 }
+
+/*
+    Basic Ped Sync Class (extended for other modules)
+    includes basic tick event and destroy class.
+*/
 class SyncPed {
     constructor(remote_id) {
         this._remote_id = remote_id;
         this._ped = mp.peds.atRemoteId(this._remote_id);
         console.log("got SyncPed", this._remote_id, this._ped)
         console.log("sync_id", this._ped.getVariable('sync_id'))
-        this.ticker = setInterval(() => {
+
+         this.ticker = new mp.Event("client:Tick", () => {
             this.tick();
-        }, 500);
+        });
     }
+    /*
+        Destroys a Synced Ped clientside (drop syncer)
+    */
     destroy() {
-        clearInterval(this.ticker);
+        if (this.ticker) {
+            this.ticker.destroy();
+        }
         if (this._renderEvent) {
             this._renderEvent.destroy();
         }
@@ -56,6 +67,11 @@ class SyncPed {
         console.log("default tick");
     }
 }
+
+/*
+    Extended SyncPed class for Zombie AI
+    @TODO add arguments for noiseAlertness, viewDistance for different zombieTypes
+*/
 class Zombie extends SyncPed {
     constructor(remoteId) {
         super(remoteId);
@@ -81,6 +97,9 @@ class Zombie extends SyncPed {
             this.render();
         });
     }
+    /*
+        Check if ped has abnormal status
+    */
     status() {
         if (this._ped.getVariable('DEAD')) this.flag = Flags.DEAD;
         if (this._ped.isRagdoll()) this.flag = Flags.RAGDOLL;
@@ -89,6 +108,9 @@ class Zombie extends SyncPed {
         }
         //if (this._ped.isDeadOrDying(true)) this.flag = Flags.DEAD;
     }
+    /*
+        Debug render info
+    */
     render() {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this.pathfinder.render();
@@ -110,6 +132,9 @@ class Zombie extends SyncPed {
             mp.game.graphics.drawLine(position.x, position.y, position.z+1, this.currentTargetPosition.x, this.currentTargetPosition.y, this.currentTargetPosition.z, 0, 255, 0, 255);
         }
     }
+    /*
+        Set ped attributes so it doesnt flee and cower
+    */
     loadPedAttributes() {
         this._ped.setMaxHealth(200);
         this._ped.setHealth(200);
@@ -137,6 +162,9 @@ class Zombie extends SyncPed {
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
         this._ped.setHealth((100 + this._ped.getVariable('HEALTH')));
     }
+    /*
+        Apply hit to player (make it stumble and so on)
+    */
     applyHit(hitData) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
@@ -164,11 +192,17 @@ class Zombie extends SyncPed {
             mp.game.invoke("0x8E04FEDD28D42462", this._ped.handle, "GENERIC_CURSE_MED", "SPEECH_PARAMS_SHOUTED", 0);
         }
     }
+    /*
+        Kill Ped
+    */
     kill() {
         this._ped.setHealth(0);
         this._ped.setToRagdoll(1000, 1000, 3, false, false, false);
         this.flag = Flags.DEAD;
     }
+    /*
+        On Init (load walkstyle etc)
+    */
     init() {
         if (!mp.game.streaming.hasClipSetLoaded(this.walkStyle)) {
             mp.game.streaming.requestClipSet(this.walkStyle);
@@ -177,15 +211,27 @@ class Zombie extends SyncPed {
         this._ped.setMovementClipset(this.walkStyle, 0.0);
         this.loadPedAttributes();
     }
+    /*
+       on IDLE
+       TODO
+    */
     idle() {
         //this.flag = Flags.IDLE;
         //console.log("PED", this.flag);
     }
+    /*
+       Walk to position
+       
+    */
     walk(position) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 0.8, 0, false, 786603, 0);
         //this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 0.4, 15000, this.newHeading, 0);
     }
+    /*
+       Run to position
+       
+    */
     run(position) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         if (!position) return false;
@@ -195,6 +241,10 @@ class Zombie extends SyncPed {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 6.2, -1, this._ped.getHeading(), 2);
         }
     }
+    /*
+       Sprint to position
+       
+    */
     sprint(position) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         if (!position) return false;
@@ -204,10 +254,18 @@ class Zombie extends SyncPed {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z,12.4, -1, this._ped.getHeading(), 2);
         }
     }
+    /*
+       Meele target
+       
+    */
     meele(targetHandle) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.taskPutDirectlyIntoMelee(targetHandle, 0.0, -1.0, 1.0, false);
     }
+    /*
+       Initiate Combat
+       
+    */
     combat(targetType, remoteId) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         var tagetEntity = false;
@@ -232,6 +290,10 @@ class Zombie extends SyncPed {
             if (this.zombieType == "sprinter") this.sprint(tEntityPos);
         }
     }
+    /*
+       Find new position, pathfinding etc
+       
+    */
     tick() {
         if (!mp.peds.atRemoteId(this._remote_id)) return console.log("no remote", this._remote_id);
         this.status();
@@ -291,24 +353,27 @@ class Zombie extends SyncPed {
         //this._ped.taskWanderStandard(10.00, 10);
     }
 }
+/*
+    Called when a players gets the job to sync a Server-NPC
+*/
 mp.events.add('acknowledgeSync', (type, remote_id) => {
     console.log("acknowledgeSync", type, remote_id);
     SyncWorld.acknowledge(type, remote_id);
 });
+/*
+    Called when a players loses the job to sync a Server-NPC
+*/
 mp.events.add('rejectSync', (type, remote_id, kill) => {
     console.log("rejectSync", type, remote_id);
     SyncWorld.reject(type, remote_id, kill);
 });
+/*
+    Called when a player shot a Server-NPC (to call .applyHit() and simulate ai)
+*/
 mp.events.add('acknowledgeHit', (remote_id, hitData) => {
     console.log("acknowledgeHit", remote_id, hitData);
     let SyncedPed = SyncWorld.getByID(remote_id);
     if (SyncedPed) {
         SyncedPed.applyHit(hitData);
     }
-});
-mp.events.add('OutgoingDamage', (sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage) => {
-    console.log("OutgoingDamage", sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage);
-});
-mp.events.add('IncomingDamage', (sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage) => {
-    console.log("IncomingDamage", sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage);
 });

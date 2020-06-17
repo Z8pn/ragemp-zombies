@@ -10,6 +10,11 @@ mp.events.add("toggleCrouch", (player) => {
         player.data.isCrouched = !player.data.isCrouched;
     }
 });
+
+
+/*
+    creates account class and sets basic stuff
+*/
 mp.events.add("playerJoin", (player) => {
     //player.dimension = player.id + 1;
     player.name = player.socialClub;

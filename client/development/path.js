@@ -1,3 +1,7 @@
+
+/*
+    Previous attempt to generate Navmesh for zombies
+*/
 class Wall {
     constructor(points) {
         this.points = points;
@@ -15,6 +19,9 @@ class Wall {
         return "wall";
     }
 }
+/*
+    Previous attempt to generate Navmesh for zombies
+*/
 class Node {
     constructor(x, y, z) {
         this.x = x;
@@ -34,6 +41,11 @@ class Node {
         return new mp.Vector3(this.x, this.y, this.z);
     }
 }
+
+
+/*
+    Pathfinder class for Zombies
+*/
 var Pathfinder = class {
     constructor(fov, viewDistance, noiseAlertness, zombieType) {
         this.fov = fov;
@@ -55,24 +67,22 @@ var Pathfinder = class {
         if (this.zombieType == "runner") this.maxIdleTicks = 6;
         if (this.zombieType == "sprinter") this.maxIdleTicks = 10;
     }
-    render() {
-        /*if (this.position) {
-            mp.game.graphics.drawText(`position\n${JSON.stringify(this.nextAction)}`, [this.position.x, this.position.y, this.position.z], {
-                font: 4,
-                color: [255, 255, 255, 255],
-                scale: [0.4, 0.4],
-                outline: true,
-                centre: true
-            });
-        }*/
-    }
+    /*
+        Is from-to LOS Clear
+    */
     isValid(from, to) {
         return mp.raycasting.testCapsule(from, to, 0.5, null, (1 | 2 | 16 | 256)) ? false : true;
     }
+    /*
+        Get Position in LOS to vector
+    */
     getNearest(from, to) {
         let rc = mp.raycasting.testCapsule(from, to, 0.2, null, (1 | 2 | 16 | 256));
         return rc ? rc.position : false;
     }
+    /*
+        get nearest noise location without LOS
+    */
     getNearestAttention() {
         let targetPosition = false;
         var attentionPlayers = [];
@@ -101,6 +111,9 @@ var Pathfinder = class {
         }
         return targetPosition;
     };
+    /*
+        get best target in LoS
+    */
     getBestTarget() {
         var visiblePlayers = [];
         mp.players.forEachInStreamRange((player) => {
@@ -130,7 +143,9 @@ var Pathfinder = class {
             return targets[0];
         }
         return false;
-    }
+    }/*
+        get random location for idle walk
+    */
     getRandomPosition() {
         if (!this.position) return false;
         if (!this.failedLastRandomPos) this.failedLastRandomPos = 1;
@@ -148,7 +163,9 @@ var Pathfinder = class {
         }
         this.failedLastRandomPos = 2;
         return false;
-    }
+    }/*
+        update next move
+    */
     evaluate() {
         if (this._updateCounter < 2) return;
         this._updateCounter = 0;
@@ -190,6 +207,9 @@ var Pathfinder = class {
         }
         this.nextAction = temp_action;
     }
+    /*
+        insert info
+    */
     update(flag, position, heading) {
         this._updateCounter += 1;
         this.position = position;
@@ -202,6 +222,9 @@ var Pathfinder = class {
         }
         this.evaluate();
     }
+    /*
+        get next move
+    */
     next() {
         return this.nextAction;
     }

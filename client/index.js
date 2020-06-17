@@ -77,7 +77,10 @@ var player_bones = {
         threshold: 0.3
     }
 }
-
+/*
+    Calculate if a hit was on bone (regardless of in vehicle or not)
+    @returns object(hit,bone,dist)
+*/
 function getIsHitOnBone(hitPosition, target) {
     let nearest_bone = "";
     let nearest_bone_dist = 99;
@@ -112,6 +115,10 @@ function getIsHitOnBone(hitPosition, target) {
         dist: nearest_bone_dist
     };
 }
+
+/*
+    Draw Debug stuff
+*/
 var impactVectors = [];
 mp.events.add("render", () => {
     impactVectors.forEach((e) => {
@@ -136,6 +143,12 @@ void AddDecal(Vector3 pos, DecalTypes decalType, float width = 1.0f, float heigh
 */
 //mp.game.graphics.addDecal(decaltype, x, y, z, dirX, dirY, dirZ, p8,p9, p10, width, height, rCoef, gCoef, bCoef, opacity, timeout, 0, 0, 0);
 //mp.game.graphics.addDecal(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19);
+
+
+/*
+    sorta shot sync, because you cant set peds attackable and have serverside synced hp
+
+*/
 mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
     let weapon_hash = mp.players.local.weapon;
     if (!targetEntity) {
@@ -175,6 +188,10 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
         console.log("targetEntity.remoteid", targetEntity.remoteid)
     }
 });
+
+/*
+    Hitmarker
+*/
 var timerHitmarker = 0;
 var timerHitmarkerKill = 0;
 var timerEnterDisable = 0;
@@ -207,10 +224,22 @@ console.log = function(...a) {
     mp.gui.chat.push("DeBuG:" + a.join(" "))
 };
 mp.nametags.enabled = true;
+
+
+/*
+    Client Tickrate
+*/
 var tickRate = 1000 / 5;
 setInterval(function() {
     mp.events.call("client:Tick");
 }, tickRate);
+
+
+
+
+/*
+    enum Flags 
+*/
 let flags_count = 0;
 var flags = {
     WALKING: flags_count++,
@@ -223,24 +252,43 @@ var flags = {
     DEAD: flags_count++,
     DEATH: flags_count++,
 }
-mp.lerp = (a, b, n) => {
-    return (1 - n) * a + n * b;
-}
 global["Flags"] = [];
 Object.keys(flags).forEach(function(key, value) {
     console.log("enums-> Flags." + key, "=", flags[key])
     global["Flags"][key] = flags[key];
 })
+/*
+    mp.lerp for lerping numbers
+*/
+mp.lerp = (a, b, n) => {
+    return (1 - n) * a + n * b;
+}
 mp.gui.chat.activate(true)
 mp.isCrouched = false;
 require("./vector.js")
 require("./sync.js")
 require("./combat.js")
 require("./movement.js")
+
+
+
+
+
+
+
+
+
+/*
+    Max out all stats
+*/
 var stats = ["SP0_STAMINA", "SP0_SHOOTING_ABILITY", "SP0_STRENGTH", "SP0_STEALTH_ABILITY", "SP0_LUNG_CAPACITY"]
 stats.forEach((element) => {
     mp.game.stats.statSetInt(mp.game.joaat(element), 100, false);
 });
+
+/*
+    Update player Noise
+*/
 let oldNoise = 0;
 mp.events.add("client:Tick", () => {
     let mul = mp.players.local.getVariable("isCrouched");
@@ -262,6 +310,11 @@ var localPlayerBlip = mp.blips.new(9, new mp.Vector3(0, 0, 0), {
     alpha: 100,
     drawDistance: 0
 });
+
+
+
+
+
 mp.events.add("render", () => {
     let mul = mp.players.local.getVariable("isCrouched");
     let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.8 : mp.game.player.getCurrentStealthNoise();
@@ -291,6 +344,10 @@ mp.events.add("render", () => {
         // mp.players.local.clearLastDamage();
     }
 });
+
+/*
+    test zombie spawning
+*/
 mp.keys.bind(0x71, true, function() {
     mp.events.callRemote('zombie_new', "walker");
 });
@@ -363,6 +420,10 @@ natives.SET_ENTITY_NO_COLLISION_ENTITY = (entity1, entity2, collision) => mp.gam
 natives.SET_RUN_SPRINT_MULTIPLIER_FOR_PLAYER = (target, mul) => mp.game.invoke("0x6DB47AA77FD94E09", target.handle, mul); // SET_RUN_SPRINT_MULTIPLIER_FOR_PLAYER
 module.exports = natives;
 },{}],5:[function(require,module,exports){
+
+/*
+    Previous attempt to generate Navmesh for zombies
+*/
 class Wall {
     constructor(points) {
         this.points = points;
@@ -380,6 +441,9 @@ class Wall {
         return "wall";
     }
 }
+/*
+    Previous attempt to generate Navmesh for zombies
+*/
 class Node {
     constructor(x, y, z) {
         this.x = x;
@@ -399,6 +463,11 @@ class Node {
         return new mp.Vector3(this.x, this.y, this.z);
     }
 }
+
+
+/*
+    Pathfinder class for Zombies
+*/
 var Pathfinder = class {
     constructor(fov, viewDistance, noiseAlertness, zombieType) {
         this.fov = fov;
@@ -420,24 +489,22 @@ var Pathfinder = class {
         if (this.zombieType == "runner") this.maxIdleTicks = 6;
         if (this.zombieType == "sprinter") this.maxIdleTicks = 10;
     }
-    render() {
-        /*if (this.position) {
-            mp.game.graphics.drawText(`position\n${JSON.stringify(this.nextAction)}`, [this.position.x, this.position.y, this.position.z], {
-                font: 4,
-                color: [255, 255, 255, 255],
-                scale: [0.4, 0.4],
-                outline: true,
-                centre: true
-            });
-        }*/
-    }
+    /*
+        Is from-to LOS Clear
+    */
     isValid(from, to) {
         return mp.raycasting.testCapsule(from, to, 0.5, null, (1 | 2 | 16 | 256)) ? false : true;
     }
+    /*
+        Get Position in LOS to vector
+    */
     getNearest(from, to) {
         let rc = mp.raycasting.testCapsule(from, to, 0.2, null, (1 | 2 | 16 | 256));
         return rc ? rc.position : false;
     }
+    /*
+        get nearest noise location without LOS
+    */
     getNearestAttention() {
         let targetPosition = false;
         var attentionPlayers = [];
@@ -466,6 +533,9 @@ var Pathfinder = class {
         }
         return targetPosition;
     };
+    /*
+        get best target in LoS
+    */
     getBestTarget() {
         var visiblePlayers = [];
         mp.players.forEachInStreamRange((player) => {
@@ -495,7 +565,9 @@ var Pathfinder = class {
             return targets[0];
         }
         return false;
-    }
+    }/*
+        get random location for idle walk
+    */
     getRandomPosition() {
         if (!this.position) return false;
         if (!this.failedLastRandomPos) this.failedLastRandomPos = 1;
@@ -513,7 +585,9 @@ var Pathfinder = class {
         }
         this.failedLastRandomPos = 2;
         return false;
-    }
+    }/*
+        update next move
+    */
     evaluate() {
         if (this._updateCounter < 2) return;
         this._updateCounter = 0;
@@ -555,6 +629,9 @@ var Pathfinder = class {
         }
         this.nextAction = temp_action;
     }
+    /*
+        insert info
+    */
     update(flag, position, heading) {
         this._updateCounter += 1;
         this.position = position;
@@ -567,6 +644,9 @@ var Pathfinder = class {
         }
         this.evaluate();
     }
+    /*
+        get next move
+    */
     next() {
         return this.nextAction;
     }
@@ -611,18 +691,29 @@ var SyncWorld = new class {
         }
     }
 }
+
+/*
+    Basic Ped Sync Class (extended for other modules)
+    includes basic tick event and destroy class.
+*/
 class SyncPed {
     constructor(remote_id) {
         this._remote_id = remote_id;
         this._ped = mp.peds.atRemoteId(this._remote_id);
         console.log("got SyncPed", this._remote_id, this._ped)
         console.log("sync_id", this._ped.getVariable('sync_id'))
-        this.ticker = setInterval(() => {
+
+         this.ticker = new mp.Event("client:Tick", () => {
             this.tick();
-        }, 500);
+        });
     }
+    /*
+        Destroys a Synced Ped clientside (drop syncer)
+    */
     destroy() {
-        clearInterval(this.ticker);
+        if (this.ticker) {
+            this.ticker.destroy();
+        }
         if (this._renderEvent) {
             this._renderEvent.destroy();
         }
@@ -631,6 +722,11 @@ class SyncPed {
         console.log("default tick");
     }
 }
+
+/*
+    Extended SyncPed class for Zombie AI
+    @TODO add arguments for noiseAlertness, viewDistance for different zombieTypes
+*/
 class Zombie extends SyncPed {
     constructor(remoteId) {
         super(remoteId);
@@ -656,6 +752,9 @@ class Zombie extends SyncPed {
             this.render();
         });
     }
+    /*
+        Check if ped has abnormal status
+    */
     status() {
         if (this._ped.getVariable('DEAD')) this.flag = Flags.DEAD;
         if (this._ped.isRagdoll()) this.flag = Flags.RAGDOLL;
@@ -664,6 +763,9 @@ class Zombie extends SyncPed {
         }
         //if (this._ped.isDeadOrDying(true)) this.flag = Flags.DEAD;
     }
+    /*
+        Debug render info
+    */
     render() {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this.pathfinder.render();
@@ -685,6 +787,9 @@ class Zombie extends SyncPed {
             mp.game.graphics.drawLine(position.x, position.y, position.z+1, this.currentTargetPosition.x, this.currentTargetPosition.y, this.currentTargetPosition.z, 0, 255, 0, 255);
         }
     }
+    /*
+        Set ped attributes so it doesnt flee and cower
+    */
     loadPedAttributes() {
         this._ped.setMaxHealth(200);
         this._ped.setHealth(200);
@@ -712,6 +817,9 @@ class Zombie extends SyncPed {
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
         this._ped.setHealth((100 + this._ped.getVariable('HEALTH')));
     }
+    /*
+        Apply hit to player (make it stumble and so on)
+    */
     applyHit(hitData) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
@@ -739,11 +847,17 @@ class Zombie extends SyncPed {
             mp.game.invoke("0x8E04FEDD28D42462", this._ped.handle, "GENERIC_CURSE_MED", "SPEECH_PARAMS_SHOUTED", 0);
         }
     }
+    /*
+        Kill Ped
+    */
     kill() {
         this._ped.setHealth(0);
         this._ped.setToRagdoll(1000, 1000, 3, false, false, false);
         this.flag = Flags.DEAD;
     }
+    /*
+        On Init (load walkstyle etc)
+    */
     init() {
         if (!mp.game.streaming.hasClipSetLoaded(this.walkStyle)) {
             mp.game.streaming.requestClipSet(this.walkStyle);
@@ -752,15 +866,27 @@ class Zombie extends SyncPed {
         this._ped.setMovementClipset(this.walkStyle, 0.0);
         this.loadPedAttributes();
     }
+    /*
+       on IDLE
+       TODO
+    */
     idle() {
         //this.flag = Flags.IDLE;
         //console.log("PED", this.flag);
     }
+    /*
+       Walk to position
+       
+    */
     walk(position) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 0.8, 0, false, 786603, 0);
         //this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 0.4, 15000, this.newHeading, 0);
     }
+    /*
+       Run to position
+       
+    */
     run(position) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         if (!position) return false;
@@ -770,6 +896,10 @@ class Zombie extends SyncPed {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 6.2, -1, this._ped.getHeading(), 2);
         }
     }
+    /*
+       Sprint to position
+       
+    */
     sprint(position) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         if (!position) return false;
@@ -779,10 +909,18 @@ class Zombie extends SyncPed {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z,12.4, -1, this._ped.getHeading(), 2);
         }
     }
+    /*
+       Meele target
+       
+    */
     meele(targetHandle) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.taskPutDirectlyIntoMelee(targetHandle, 0.0, -1.0, 1.0, false);
     }
+    /*
+       Initiate Combat
+       
+    */
     combat(targetType, remoteId) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         var tagetEntity = false;
@@ -807,6 +945,10 @@ class Zombie extends SyncPed {
             if (this.zombieType == "sprinter") this.sprint(tEntityPos);
         }
     }
+    /*
+       Find new position, pathfinding etc
+       
+    */
     tick() {
         if (!mp.peds.atRemoteId(this._remote_id)) return console.log("no remote", this._remote_id);
         this.status();
@@ -866,14 +1008,23 @@ class Zombie extends SyncPed {
         //this._ped.taskWanderStandard(10.00, 10);
     }
 }
+/*
+    Called when a players gets the job to sync a Server-NPC
+*/
 mp.events.add('acknowledgeSync', (type, remote_id) => {
     console.log("acknowledgeSync", type, remote_id);
     SyncWorld.acknowledge(type, remote_id);
 });
+/*
+    Called when a players loses the job to sync a Server-NPC
+*/
 mp.events.add('rejectSync', (type, remote_id, kill) => {
     console.log("rejectSync", type, remote_id);
     SyncWorld.reject(type, remote_id, kill);
 });
+/*
+    Called when a player shot a Server-NPC (to call .applyHit() and simulate ai)
+*/
 mp.events.add('acknowledgeHit', (remote_id, hitData) => {
     console.log("acknowledgeHit", remote_id, hitData);
     let SyncedPed = SyncWorld.getByID(remote_id);
@@ -881,13 +1032,14 @@ mp.events.add('acknowledgeHit', (remote_id, hitData) => {
         SyncedPed.applyHit(hitData);
     }
 });
-mp.events.add('OutgoingDamage', (sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage) => {
-    console.log("OutgoingDamage", sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage);
-});
-mp.events.add('IncomingDamage', (sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage) => {
-    console.log("IncomingDamage", sourceEntity, targetEntity, targetPlayer, weapon, boneIndex, damage);
-});
+
 },{"./natives.js":4,"./path.js":5}],7:[function(require,module,exports){
+
+
+/*
+    gets point from rotation, distance and rotation offset
+    @returns vector
+*/
 mp.Vector3.prototype.findRot = function(rz, dist, rot) {
     let nVector = new mp.Vector3(this.x, this.y, this.z);
     let degrees = (rz + rot) * (Math.PI / 180);
@@ -895,6 +1047,11 @@ mp.Vector3.prototype.findRot = function(rz, dist, rot) {
     nVector.y = this.y + dist * Math.sin(degrees);
     return nVector;
 }
+
+/*
+    get rotation to point
+    @returns float
+*/
 mp.Vector3.prototype.rotPoint = function(pos) {
     let temp = new mp.Vector3(this.x, this.y, this.z);
     let temp1 = new mp.Vector3(pos.x, pos.y, pos.z);
@@ -905,6 +1062,10 @@ mp.Vector3.prototype.rotPoint = function(pos) {
     let winkel = Math.atan2(gegenkathete, ankathete) * 180 / Math.PI
     return winkel;
 }
+/*
+    vector to screen
+    @returns object(x,y)
+*/
 mp.Vector3.prototype.toPixels = function() {
     let clientScreen = mp.game.graphics.getScreenActiveResolution(0, 0);
     let toScreen = mp.game.graphics.world3dToScreen2d(new mp.Vector3(pos.x, pos.y, pos.z)) || {
@@ -916,7 +1077,10 @@ mp.Vector3.prototype.toPixels = function() {
         y: Math.floor(clientScreen.y * toScreen.y) + "px"
     };
 }
-
+/*
+    lerp vector
+    @returns vector
+*/
 mp.Vector3.prototype.lerp = function(vector2, deltaTime) {
     let nVector = new mp.Vector3(this.x, this.y, this.z);
     nVector.x = this.x + (vector2.x - this.x) * deltaTime
@@ -924,6 +1088,11 @@ mp.Vector3.prototype.lerp = function(vector2, deltaTime) {
     nVector.z = this.z + (vector2.z - this.z) * deltaTime
     return nVector;
 }
+
+/*
+    multiply vector by n
+    @returns vector
+*/
 mp.Vector3.prototype.multiply = function(n) {
     let nVector = new mp.Vector3(this.x, this.y, this.z);
     nVector.x = this.x * n;
@@ -931,23 +1100,41 @@ mp.Vector3.prototype.multiply = function(n) {
     nVector.z = this.z * n;
     return nVector;
 }
+/*
+    calc 3d(x,y,z) dist to vector
+    @returns float
+*/
 mp.Vector3.prototype.dist = function(to) {
     let a = this.x - to.x;
     let b = this.y - to.y;
     let c = this.z - to.z;
     return Math.sqrt(a * a + b * b + c * c);
 }
+
+/*
+    calc 2d(x,y) dist to vector
+    @returns float
+*/
 mp.Vector3.prototype.dist2d = function(to) {
     let a = this.x - to.x;
     let b = this.y - to.y;
     return Math.sqrt(a * a + b * b);
 }
+/*
+    get offset from Vector
+    @returns vector
+*/
 mp.Vector3.prototype.getOffset = function(to) {
     let x = this.x - to.x;
     let y = this.y - to.y;
     let z = this.z - to.z;
     return new mp.Vector3(x, y, z);
 }
+
+/*
+   return crossproduct of vector
+    @returns vector
+*/
 mp.Vector3.prototype.cross = function(to) {
     let vector = new mp.Vector3(0, 0, 0);
     vector.x = this.y * to.z - this.z * to.y;
@@ -955,6 +1142,10 @@ mp.Vector3.prototype.cross = function(to) {
     vector.z = this.x * to.y - this.y * to.x;
     return vector;
 }
+/*
+    normalize vector
+    @returns vector
+*/
 mp.Vector3.prototype.normalize = function() {
     let vector = new mp.Vector3(0, 0, 0);
     let mag = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
@@ -963,15 +1154,33 @@ mp.Vector3.prototype.normalize = function() {
     vector.z = this.z / mag;
     return vector;
 }
+/*
+    returns vector dot
+    @returns float
+*/
 mp.Vector3.prototype.dot = function(to) {
     return this.x * to.x + this.y * to.y + this.z * to.z;
 }
+/*
+    returns vector length
+    @returns float
+*/
 mp.Vector3.prototype.length = function() {
     return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
 }
+
+/*
+    calculate angel from this vector to other vector
+    @returns float
+*/
 mp.Vector3.prototype.angle = function(to) {
     return Math.acos(this.normalize().dot(to.normalize()));
 }
+
+/*
+    gets ground vector for position (GTA Native)
+    @returns vector
+*/
 mp.Vector3.prototype.ground = function() {
     let nVector = new mp.Vector3(this.x, this.y, this.z);
     let z = mp.game.gameplay.getGroundZFor3dCoord(nVector.x, nVector.y, nVector.z, 0, false)
@@ -987,6 +1196,11 @@ mp.Vector3.prototype.ground = function() {
     }
     return nVector;
 }
+
+/*
+    gets ground vector for position (raycast)
+    @returns vector
+*/
 mp.Vector3.prototype.ground2 = function(ignore) {
     let nVector = new mp.Vector3(this.x, this.y, this.z);
     let r = mp.raycasting.testPointToPoint(nVector.add(0, 0, 1), nVector.sub(0, 0, 100), ignore, (1 | 16));
@@ -995,12 +1209,24 @@ mp.Vector3.prototype.ground2 = function(ignore) {
     }
     return nVector;
 }
+/*
+    sub x,y,z from vector
+    @returns vector
+*/
 mp.Vector3.prototype.sub = function(x, y, z) {
     return new mp.Vector3(this.x - x, this.y - y, this.z - z);
 };
+/*
+    add x,y,z to vector
+    @returns vector
+*/
 mp.Vector3.prototype.add = function(x, y, z) {
     return new mp.Vector3(this.x + x, this.y + y, this.z + z);
 };
+/*
+    check if point is inside array of points
+    @returns bool
+*/
 mp.Vector3.prototype.insidePolygon = function(polygon) {
     let x = this.x,
         y = this.y; 
@@ -1015,9 +1241,18 @@ mp.Vector3.prototype.insidePolygon = function(polygon) {
     }
     return inside;
 };
+
+/*
+    converts vector to new vector (with vector class support, as ragemp is kindla ugly with prototyping)
+    @returns vector
+*/
 mp.vector = function(vec) {
     return new mp.Vector3(vec.x, vec.y, vec.z);
 }
+/*
+    shuffle array
+    @returns array
+*/
 Array.prototype.shuffle = function() {
     let i = this.length;
     while (i) {

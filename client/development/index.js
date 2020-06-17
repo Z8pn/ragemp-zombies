@@ -6,10 +6,22 @@ console.log = function(...a) {
     mp.gui.chat.push("DeBuG:" + a.join(" "))
 };
 mp.nametags.enabled = true;
+
+
+/*
+    Client Tickrate
+*/
 var tickRate = 1000 / 5;
 setInterval(function() {
     mp.events.call("client:Tick");
 }, tickRate);
+
+
+
+
+/*
+    enum Flags 
+*/
 let flags_count = 0;
 var flags = {
     WALKING: flags_count++,
@@ -22,24 +34,43 @@ var flags = {
     DEAD: flags_count++,
     DEATH: flags_count++,
 }
-mp.lerp = (a, b, n) => {
-    return (1 - n) * a + n * b;
-}
 global["Flags"] = [];
 Object.keys(flags).forEach(function(key, value) {
     console.log("enums-> Flags." + key, "=", flags[key])
     global["Flags"][key] = flags[key];
 })
+/*
+    mp.lerp for lerping numbers
+*/
+mp.lerp = (a, b, n) => {
+    return (1 - n) * a + n * b;
+}
 mp.gui.chat.activate(true)
 mp.isCrouched = false;
 require("./vector.js")
 require("./sync.js")
 require("./combat.js")
 require("./movement.js")
+
+
+
+
+
+
+
+
+
+/*
+    Max out all stats
+*/
 var stats = ["SP0_STAMINA", "SP0_SHOOTING_ABILITY", "SP0_STRENGTH", "SP0_STEALTH_ABILITY", "SP0_LUNG_CAPACITY"]
 stats.forEach((element) => {
     mp.game.stats.statSetInt(mp.game.joaat(element), 100, false);
 });
+
+/*
+    Update player Noise
+*/
 let oldNoise = 0;
 mp.events.add("client:Tick", () => {
     let mul = mp.players.local.getVariable("isCrouched");
@@ -61,6 +92,11 @@ var localPlayerBlip = mp.blips.new(9, new mp.Vector3(0, 0, 0), {
     alpha: 100,
     drawDistance: 0
 });
+
+
+
+
+
 mp.events.add("render", () => {
     let mul = mp.players.local.getVariable("isCrouched");
     let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.8 : mp.game.player.getCurrentStealthNoise();
@@ -90,6 +126,10 @@ mp.events.add("render", () => {
         // mp.players.local.clearLastDamage();
     }
 });
+
+/*
+    test zombie spawning
+*/
 mp.keys.bind(0x71, true, function() {
     mp.events.callRemote('zombie_new', "walker");
 });
