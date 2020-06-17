@@ -19,7 +19,7 @@ var PlayerAccount = class {
     }
     tick() {}
 }
-
+//self._player.addAttachment(e.hash, false);
 /*
     Syncs Noise over to other clients so the syncer of NPCs can calculate"
 */

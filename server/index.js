@@ -1,4 +1,6 @@
+require("./libs/attachments.js")
 var PlayerAccount = require("./models/player.js")
+
 var Peds = require("./models/peds.js")
 mp.events.add("playerDeath", (player) => {
     player.data.isCrouched = false;
