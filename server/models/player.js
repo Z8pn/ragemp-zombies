@@ -26,7 +26,7 @@ var PlayerAccount = class {
 mp.events.add("client:noise", (player, noise) => {
 
     player.setVariable("movementNoise",noise);
-    console.log("Set movementNoise to",noise,player.name)
+    //console.log("Set movementNoise to",noise,player.name)
 
 
 });

@@ -150,7 +150,7 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
     if (!targetEntity) {
         let hand_pos = mp.players.local.getBoneCoords(57005, 0, 0, 0);
         // let raycast = mp.raycasting.testPointToPoint(hand_pos, targetPosition, mp.players.local, (4 | 8));
-        let raycast = mp.raycasting.testCapsule(hand_pos, targetPosition, 0.3, mp.players.local, (4 | 8 | 1 | 2 | 16))
+        let raycast = mp.raycasting.testCapsule(hand_pos, targetPosition, 0.1, mp.players.local, (4 | 8 | 1 | 2 | 16))
         if (raycast && raycast.surfaceNormal) {
             //mp.game.graphics.addDecal(1110 /*splatters_blood2 */ , targetPosition.x, targetPosition.y, targetPosition.z, 0 /*dirX*/ , 0 /*dirY*/ , -1 /*dirZ*/ , 0, /*rot*/ 1, 0, 4 /*width*/ , 4 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
             mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ ,1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
@@ -170,8 +170,8 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
             if (typeof raycast.entity == "number") {
                 let localPed = mp.peds.atHandle(raycast.entity)
                 if (localPed) {
-                    console.log("zombie", localPed.getVariable('zombie'))
-                    if (localPed.getVariable('zombie')) {
+                    console.log("syncPed", localPed.getVariable('syncPed'))
+                    if (localPed.getVariable('syncPed')) {
                         if (localPed.getVariable('DEAD')) return;
                         let hitData = getIsHitOnBone(targetPosition, localPed);
                         console.log("hitData", hitData);

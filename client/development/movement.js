@@ -15,7 +15,7 @@ loadAnimDict("move_crawl");
 
 const movementClipSet = "move_ped_crouched";
 const strafeClipSet = "move_ped_crouched_strafing";
-const clipSetSwitchTime = 0.5;
+const clipSetSwitchTime = 0.25;
 const loadClipSet = (clipSetName) => {
     mp.game.streaming.requestClipSet(clipSetName);
     while (!mp.game.streaming.hasClipSetLoaded(clipSetName)) mp.game.wait(0);

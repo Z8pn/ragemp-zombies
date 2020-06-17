@@ -1,6 +1,4 @@
 require("./vector.js");
-mp.game.audio.startAudioScene("FBI_HEIST_H5_MUTE_AMBIENCE_SCENE");
-mp.game.audio.startAudioScene("MIC1_RADIO_DISABLE");
 var Weather = new class {
     constructor() {
         this._areas = [];

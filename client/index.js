@@ -10,7 +10,7 @@ if (mp.attachmentMngr) {
     mp.attachmentMngr.register("pot_head", "prop_kitch_pot_sm", Bones.SKEL_Head, new mp.Vector3(0.1, 0, 0), new mp.Vector3(0, 270, 0));
     mp.attachmentMngr.register("bucket_head", "prop_buck_spade_06", Bones.SKEL_Head, new mp.Vector3(0.1, 0, 0), new mp.Vector3(0, 270, 0));
 }
-},{"./libs/skeleton.js":5}],2:[function(require,module,exports){
+},{"./libs/skeleton.js":8}],2:[function(require,module,exports){
 var player_bones = {
     "SKEL_L_UpperArm": {
         bone_id: 45509,
@@ -163,7 +163,7 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
     if (!targetEntity) {
         let hand_pos = mp.players.local.getBoneCoords(57005, 0, 0, 0);
         // let raycast = mp.raycasting.testPointToPoint(hand_pos, targetPosition, mp.players.local, (4 | 8));
-        let raycast = mp.raycasting.testCapsule(hand_pos, targetPosition, 0.3, mp.players.local, (4 | 8 | 1 | 2 | 16))
+        let raycast = mp.raycasting.testCapsule(hand_pos, targetPosition, 0.1, mp.players.local, (4 | 8 | 1 | 2 | 16))
         if (raycast && raycast.surfaceNormal) {
             //mp.game.graphics.addDecal(1110 /*splatters_blood2 */ , targetPosition.x, targetPosition.y, targetPosition.z, 0 /*dirX*/ , 0 /*dirY*/ , -1 /*dirZ*/ , 0, /*rot*/ 1, 0, 4 /*width*/ , 4 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
             mp.game.graphics.addDecal(1110, raycast.position.x, raycast.position.y, raycast.position.z, 0 /*dirX*/ , 0 /*dirY*/ , 0 /*dirZ*/ , 0, /*rot*/ 1, 0, 1 /*width*/ ,1 /*height*/ , 255, 0.1, 0.1, 1.0, 150.0, false, false, false);
@@ -183,8 +183,8 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
             if (typeof raycast.entity == "number") {
                 let localPed = mp.peds.atHandle(raycast.entity)
                 if (localPed) {
-                    console.log("zombie", localPed.getVariable('zombie'))
-                    if (localPed.getVariable('zombie')) {
+                    console.log("syncPed", localPed.getVariable('syncPed'))
+                    if (localPed.getVariable('syncPed')) {
                         if (localPed.getVariable('DEAD')) return;
                         let hitData = getIsHitOnBone(targetPosition, localPed);
                         console.log("hitData", hitData);
@@ -234,19 +234,104 @@ mp.events.add("client:killmarker", () => {
     timerHitmarkerKill = Date.now() / 1000;
 });
 },{}],3:[function(require,module,exports){
-(function (global){
-require("./libs/attachmentSync.js")
-require("./libs/weapon_attachments.js")
-var Bones = require("./libs/skeleton.js")
-require("./attachments.js")
+/*
+    Generate Spawn Map
+*/
+var MapGenerator = new class {
+    constructor() {
+        this.start_x = -4000;
+        this.start_y = 7000;
+        this.current_x = 0;
+        this.current_y = 0;
+        this.target_x = 3240;
+        this.target_y = -5000;
+        this.status = 0;
+        this.steps = setInterval(() => {
+            this.tick();
+        }, 100);
+    }
+    tick() {
+        if (!this.status) return;
+        if ((this.current_x > this.target_x) && (this.current_y > this.target_y)) {
+            this.current_y -= 100;
+            this.current_x = this.start_x;
+        }
+        this.current_x += 100;
+        if ((this.current_x < this.target_x) && (this.current_y < this.target_y)) this.status = 0;
+        let newPosition = new mp.Vector3(this.current_x, this.current_y, 500)
+        let g = newPosition.ground();
+        mp.players.local.setCoords(g.x, g.y, g.z + 50, false, false, false, false);
+        let pos_map = [];
+        for (var cx = this.current_x - 100; cx < this.current_x + 100; cx += 5) {
+            for (var cy = this.current_y - 100; cy < this.current_y + 100; cy += 5) {
+                let nPos = new mp.Vector3(cx, cy, 500)
+                let tPos = new mp.Vector3(cx, cy, -100)
+                let raycast = mp.raycasting.testCapsule(nPos, tPos, 0.5, mp.players.local, (1 | 16 | 256))
+                let d = {};
+                d.x = cx
+                d.y = cy
+                d.z = cy
+                d.m = 0
+                if (raycast && raycast.position && raycast.material) {
+                    //console.log(raycast.material);
+                    d.x = raycast.position.x.toFixed(3);
+                    d.y = raycast.position.y.toFixed(3);
+                    d.z = raycast.position.z.toFixed(3);
+                    d.m = raycast.material;
+                    pos_map.push(d);
+                }
+            }
+        }
+        mp.events.callRemote('client:generateMap', JSON.stringify(pos_map));
+        // let raycast = mp.raycasting.testCapsule(hand_pos, targetPosition, 0.3, mp.players.local, (4 | 8 | 1 | 2 | 16))
+        // mp.events.callRemote('client:noise', this.oldNoise.toFixed(2));
+    }
+    start() {
+        this.current_x = this.start_x;
+        this.current_y = this.start_y;
+        this.status = 1;
+    }
+}
+mp.events.add("playerCommand", (command) => {
+    const args = command.split(/[ ]+/);
+    const commandName = args[0];
+    args.shift();
+    // 3240 -5000
+    if (commandName === "target") {
+        mp.gui.chat.push(`Set Target To ${args.join(",")}`);
+        MapGenerator.target_x = args[0];
+        MapGenerator.target_y = args[1];
+    }
+    // -2400 8000
+    if (commandName === "origin") {
+        mp.gui.chat.push(`Set Origin To ${args.join(",")}`);
+        MapGenerator.current_x = args[0];
+        MapGenerator.current_y = args[1];
+    }
+    if (commandName === "start") {
+        mp.gui.chat.push(`Started Mapping`);
+        MapGenerator.start()
+    }
+    if (commandName === "stop") {
+        mp.gui.chat.push(`Clearing Damagepacks`);
+        mp.players.local.clearBloodDamage();
+    }
+});
+},{}],4:[function(require,module,exports){
 console.log = function(...a) {
     a = a.map(function(e) {
         return JSON.stringify(e);
     })
     mp.gui.chat.push("DeBuG:" + a.join(" "))
 };
+mp.debug = false;
+require("./libs/enums.js")
+require("./libs/attachmentSync.js")
+require("./libs/weapon_attachments.js")
+var Bones = require("./libs/skeleton.js")
+mp.camera = require("./libs/camera.js")
+require("./attachments.js")
 mp.nametags.enabled = true;
-
 /*
     Client Tickrate
 */
@@ -254,26 +339,6 @@ var tickRate = 1000 / 5;
 setInterval(function() {
     mp.events.call("client:Tick");
 }, tickRate);
-/*
-    enum Flags 
-*/
-let flags_count = 0;
-var flags = {
-    WALKING: flags_count++,
-    SPRINT: flags_count++,
-    RUNNING: flags_count++,
-    IDLE: flags_count++,
-    COMBAT: flags_count++,
-    RAGDOLL: flags_count++,
-    STUMBLE: flags_count++,
-    DEAD: flags_count++,
-    DEATH: flags_count++,
-}
-global["Flags"] = [];
-Object.keys(flags).forEach(function(key, value) {
-    console.log("enums-> Flags." + key, "=", flags[key])
-    global["Flags"][key] = flags[key];
-})
 /*
     mp.lerp for lerping numbers
 */
@@ -293,8 +358,8 @@ require("./sync.js")
 require("./combat.js")
 require("./movement.js")
 require("./weather.js")
-
-
+require("./generator.js")
+var Noise = require("./noise.js")
 /*
     Max out all stats
 */
@@ -302,28 +367,11 @@ var stats = ["SP0_STAMINA", "SP0_SHOOTING_ABILITY", "SP0_STRENGTH", "SP0_STEALTH
 stats.forEach((element) => {
     mp.game.stats.statSetInt(mp.game.joaat(element), 100, false);
 });
-/*
-    Update player Noise
-*/
-let oldNoise = 0;
-mp.events.add("client:Tick", () => {
-    let mul = mp.players.local.getVariable("isCrouched");
-    let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.8 : mp.game.player.getCurrentStealthNoise();
-    if (mp.players.local.isInAnyVehicle(false)) {
-        localNoise *= 2;
-        if (mp.players.local.vehicle.getIsEngineRunning()) {
-            localNoise += 15;
-        }
-    }
-    if (oldNoise != localNoise) {
-        oldNoise = localNoise;
-        mp.events.callRemote('client:noise', localNoise.toFixed(2));
-    }
-});
 var localPlayerBlip = mp.blips.new(9, new mp.Vector3(0, 0, 0), {
     color: 3,
     scale: 0.2,
     alpha: 100,
+    shortRange: true,
     drawDistance: 0
 });
 mp.events.add("render", () => {
@@ -331,15 +379,7 @@ mp.events.add("render", () => {
     //    mp.players.local.taskPlayAnim("move_crawl", "onfront_fwd", 8.0, 1.0, -1, 9, 0.0, false, false, false);
     //    mp.players.local.taskPlayAnim("move_crawl", "onfront_fwd", 8.0, 1.0, -1, 43, 0.0, false, false, false);
     //}
-
-
     //mp.players.local.taskAimGunScripted(mp.game.gameplay.getHashKey("SCRIPTED_GUN_TASK_PLANE_WING"), true, true);
-
-
-
-
-
-
     let mul = mp.players.local.getVariable("isCrouched");
     let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.8 : mp.game.player.getCurrentStealthNoise();
     if (mp.players.local.isInAnyVehicle(false)) {
@@ -380,8 +420,20 @@ mp.keys.bind(0x72, true, function() {
 mp.keys.bind(0x73, true, function() {
     mp.events.callRemote('zombie_new', "sprinter");
 });
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./attachments.js":1,"./combat.js":2,"./libs/attachmentSync.js":4,"./libs/skeleton.js":5,"./libs/weapon_attachments.js":7,"./movement.js":8,"./sync.js":11,"./vector.js":12,"./weather.js":13}],4:[function(require,module,exports){
+
+/*
+    Test Decals
+*/
+mp.events.add("playerCommand", (command) => {
+    const args = command.split(/[ ]+/);
+    const commandName = args[0];
+    args.shift();
+    if (commandName === "debug") {
+        mp.gui.chat.push(`changing Debug mode`);
+        mp.debug = !mp.debug ;
+    }
+});
+},{"./attachments.js":1,"./combat.js":2,"./generator.js":3,"./libs/attachmentSync.js":5,"./libs/camera.js":6,"./libs/enums.js":7,"./libs/skeleton.js":8,"./libs/weapon_attachments.js":10,"./movement.js":11,"./noise.js":13,"./sync.js":15,"./vector.js":16,"./weather.js":17}],5:[function(require,module,exports){
 mp.attachmentMngr = {
     attachments: {},
     addFor: function(entity, id) {
@@ -481,7 +533,7 @@ mp.events.add("entityStreamOut", (entity) => {
 });
 mp.events.addDataHandler("attachmentsData", (entity, data) => {
     let newAttachments = (data.length > 0) ? data.split('|').map(att => parseInt(att, 36)) : [];
-    console.log("attachmentsData",JSON.stringify(newAttachments));
+    console.log("attachmentsData", JSON.stringify(newAttachments));
     if (entity.handle !== 0) {
         let oldAttachments = entity.__attachments;
         if (!oldAttachments) {
@@ -523,7 +575,147 @@ function InitAttachmentsOnJoin() {
     });
 }
 InitAttachmentsOnJoin();
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
+class helperCamera {
+    constructor(name, cam) {
+        this.name = name;
+        this.cam = cam;
+    }
+}
+class helperGarbage {
+    constructor(oldCamera, currentCamera) {
+        this.oldCamera = oldCamera;
+        this.currentCamera = currentCamera;
+    }
+}
+class Camera {
+    constructor() {
+        this.helperCamera = [];
+        this.helperGarbage = [];
+        this.garbage = [];
+        this.collectInterpolationGarbage();
+    }
+    createCamera(name, position) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera) {
+            if (mp.cameras.exists(camera.cam)) camera.cam.destroy();
+            camera.cam = mp.cameras.new(name, position, new mp.Vector3(0, 0, 0), 50);
+            camera.name = name;
+        } else {
+            this.list.push(new helperCamera(name, mp.cameras.new(name, position, new mp.Vector3(0, 0, 0), 50)));
+        }
+    }
+    setCameraActive(name) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera) {
+            if (!mp.cameras.exists(camera.cam)) return false;
+            camera.cam.setActive(true);
+            mp.game.cam.renderScriptCams(true, false, 0, false, false);
+        }
+    }
+    setCameraEntity(name, entity) {
+        if (entity == undefined) return false;
+        if (!mp.players.exists(entity)) return false;
+        var camera = this.list.find(element => element.name == name);
+        if (camera) {
+            if (mp.cameras.exists(camera.cam)) camera.cam.pointAt(entity.handle, 0.0, 0.0, 0.0, true);
+        }
+    }
+    setCameraLookAtBone(name, entity, boneIndex) {
+        if (entity == undefined) return false;
+        var camera = this.list.find(element => element.name == name);
+        if (camera)
+            if (mp.cameras.exists(camera.cam)) camera.cam.pointAtPedBone(entity, boneIndex, 0, 0, 0, true);
+    }
+    setCameraPosition(name, position) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera)
+            if (mp.cameras.exists(camera.cam)) camera.cam.setCoord(position.x, position.y, position.z);
+    }
+    setCameraLookAt(name, position) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera)
+            if (mp.cameras.exists(camera.cam)) camera.cam.pointAtCoord(position.x, position.y, position.z);
+    }
+    getCameraFov(name) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera)
+            if (mp.cameras.exists(camera.cam)) return camera.cam.getFov();
+    }
+    setCameraFov(name, fov) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera)
+            if (mp.cameras.exists(camera.cam)) return camera.cam.setFov(fov);
+    }
+    setCameraInterpolate(name, position, pointAt, duration) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera) {
+            var tempCamera = mp.cameras.new("InterpolateCamera", position, new mp.Vector3(0, 0, 0), camera.cam.getFov());
+            tempCamera.pointAtCoord(pointAt.x, pointAt.y, pointAt.z);
+            tempCamera.setActiveWithInterp(camera.cam.handle, duration, 0, 0);
+            mp.game.cam.renderScriptCams(true, false, 0, false, false);
+            this.addInterpolationGargabe(camera.cam, tempCamera);
+            camera.cam = tempCamera;
+        }
+    }
+    destroyCamera(name) {
+        var camera = this.list.find(element => element.name == name);
+        if (camera) {
+            this.deleteAllInterpolations();
+            if (!mp.cameras.exists(camera.cam)) return false;
+            camera.cam.setActive(false);
+            camera.cam.destroy();
+            mp.game.cam.renderScriptCams(false, false, 0, false, false);
+        }
+    }
+    collectInterpolationGarbage() {
+        mp.events.add("render", () => {
+            this.garbage.forEach((element) => {
+                if (!mp.cameras.exists(element.oldCamera)) return false;
+                if (element.oldCamera.isInterpolating()) return false;
+                if (mp.cameras.exists(element.oldCamera)) element.oldCamera.destroy();
+                var index = this.garbage.findIndex(element => element.currentCamera == element.currentCamera);
+                this.garbage.splice(index, 1);
+            });
+        });
+    }
+    addInterpolationGargabe(oldCamera, currentCamera) {
+        this.garbage.push(new helperGarbage(oldCamera, currentCamera));
+    }
+    deleteAllInterpolations() {
+        this.garbage.forEach((element) => {
+            if (!mp.cameras.exists(element.oldCamera)) return false;
+            element.oldCamera.destroy();
+            var index = this.garbage.findIndex(element => element.currentCamera == element.currentCamera);
+            this.garbage.splice(index, 1);
+        });
+    }
+}
+module.exports = new Camera();
+},{}],7:[function(require,module,exports){
+(function (global){
+/*
+    enum Flags 
+*/
+let flags_count = 0;
+var flags = {
+    WALKING: flags_count++,
+    SPRINT: flags_count++,
+    RUNNING: flags_count++,
+    IDLE: flags_count++,
+    COMBAT: flags_count++,
+    FALLING: flags_count++,
+    RAGDOLL: flags_count++,
+    STUMBLE: flags_count++,
+    DEAD: flags_count++
+}
+global["Flags"] = [];
+Object.keys(flags).forEach(function(key, value) {
+    console.log("enums-> Flags." + key, "=", flags[key])
+    global["Flags"][key] = flags[key];
+})
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],8:[function(require,module,exports){
 var Skeleton = [];
 Skeleton.SKEL_ROOT = 0;
 Skeleton.FB_R_Brow_Out_000 = 1356;
@@ -624,7 +816,7 @@ Skeleton.SKEL_L_Clavicle = 64729;
 Skeleton.FACIAL_facialRoot = 65068;
 Skeleton.IK_L_Foot = 65245;
 module.exports = Skeleton;
-},{}],6:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 module.exports={
   "2725352035": {
     "HashKey": "WEAPON_UNARMED",
@@ -9853,7 +10045,7 @@ module.exports={
     "DLC": "spupgrade"
   }
 }
-},{}],7:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 const weaponData = require("./weaponData");
 
 const PistolAttachmentPos = new mp.Vector3(0.02, 0.06, 0.1);
@@ -9938,7 +10130,7 @@ for (let weapon in weaponAttachmentData) {
 }
 
 
-},{"./weaponData":6}],8:[function(require,module,exports){
+},{"./weaponData":9}],11:[function(require,module,exports){
 //mp.canCrouch = true;
 const loadAnimDict = (AnimDictName) => {
     if (!mp.game.streaming.hasAnimDictLoaded(AnimDictName)) {
@@ -9956,7 +10148,7 @@ loadAnimDict("move_crawl");
 
 const movementClipSet = "move_ped_crouched";
 const strafeClipSet = "move_ped_crouched_strafing";
-const clipSetSwitchTime = 0.5;
+const clipSetSwitchTime = 0.25;
 const loadClipSet = (clipSetName) => {
     mp.game.streaming.requestClipSet(clipSetName);
     while (!mp.game.streaming.hasClipSetLoaded(clipSetName)) mp.game.wait(0);
@@ -9988,7 +10180,7 @@ mp.events.add("render", () => {
         //}
     }
 })
-},{}],9:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 var natives = {};
 mp.game.graphics.clearDrawOrigin = () => mp.game.invoke('0xFF0B610F6BE0D7AF'); // 26.07.2018 // GTA 1.44 
 natives.START_PLAYER_TELEPORT = (player, x, y, z, heading, p5, p6, p7) => mp.game.invoke("0xAD15F075A4DA0FDE", player, x, y, z, heading, p5, p6, p7);
@@ -10011,7 +10203,44 @@ natives.SET_BLIP_SCALE = (blip, scale) => mp.game.invoke("0xD38744167B2FA257", b
 natives.SET_ENTITY_NO_COLLISION_ENTITY = (entity1, entity2, collision) => mp.game.invoke("0xA53ED5520C07654A", entity1.handle, entity2.handle, collision); // SET_ENTITY_NO_COLLISION_ENTITY
 natives.SET_RUN_SPRINT_MULTIPLIER_FOR_PLAYER = (target, mul) => mp.game.invoke("0x6DB47AA77FD94E09", target.handle, mul); // SET_RUN_SPRINT_MULTIPLIER_FOR_PLAYER
 module.exports = natives;
-},{}],10:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
+mp.game.audio.startAudioScene("FBI_HEIST_H5_MUTE_AMBIENCE_SCENE");
+mp.game.audio.startAudioScene("MIC1_RADIO_DISABLE");
+
+/*
+    Update player Noise
+*/
+class Noise {
+    constructor() {
+        this.oldNoise = 0;
+        this.ticker = new mp.Event("client:Tick", () => {
+            this.tick();
+        });
+    }
+    get() {
+        let mul = mp.players.local.getVariable("isCrouched");
+        let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.5 : mp.game.player.getCurrentStealthNoise();
+        if (mp.players.local.isInAnyVehicle(false)) {
+            localNoise *= 2;
+            if (mp.players.local.vehicle.getIsEngineRunning()) {
+                localNoise += 15;
+            }
+            if (mp.players.local.vehicle.isSirenSoundOn()) {
+                localNoise += 55;
+            }
+        }
+        return localNoise;
+    }
+    tick() {
+        let n = this.get();
+        if (n != this.oldNoise) {
+            this.oldNoise = n;
+            mp.events.callRemote('client:noise', this.oldNoise.toFixed(2));
+        }
+    }
+}
+module.exports = new Noise();
+},{}],14:[function(require,module,exports){
 
 /*
     Previous attempt to generate Navmesh for zombies
@@ -10061,8 +10290,7 @@ class Node {
     Pathfinder class for Zombies
 */
 var Pathfinder = class {
-    constructor(fov, viewDistance, noiseAlertness, zombieType) {
-        this.fov = fov;
+    constructor(viewDistance, noiseAlertness, zombieType) {
         this.viewDistance = viewDistance;
         this.noiseAlertness = noiseAlertness;
         this.vision = [];
@@ -10226,6 +10454,9 @@ var Pathfinder = class {
         if (this.flag == Flags.RAGDOLL) {
             temp_action.flag = Flags.RAGDOLL;
         }
+        if (this.flag == Flags.FALLING) {
+            temp_action.flag = Flags.FALLING;
+        }
         this.nextAction = temp_action;
     }
     /*
@@ -10251,9 +10482,8 @@ var Pathfinder = class {
     }
 }
 module.exports = Pathfinder;
-},{}],11:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 var Bones = require("./libs/skeleton.js")
-var debug = true
 var Pathfinder = require("./path.js");
 var natives = require("./natives.js");
 const loadClipSet = (clipSetName) => {
@@ -10261,6 +10491,40 @@ const loadClipSet = (clipSetName) => {
     while (!mp.game.streaming.hasClipSetLoaded(clipSetName)) mp.game.wait(0);
 };
 loadClipSet("move_m@drunk@verydrunk");
+
+function applyZombieAttributes(ped) {
+    if (!ped) return;
+    console.log("applyZombieAttributes")
+    ped.setMaxHealth(200);
+    ped.setHealth(200);
+    ped.setSweat(100);
+    ped.setSuffersCriticalHits(false);
+    ped.freezePosition(false);
+    ped.setCombatAbility(100);
+    ped.setCombatMovement(3);
+    for (var i = 1; i < 64; i += 2) {
+        ped.setFleeAttributes(i, false);
+    }
+    ped.setFleeAttributes(0, false);
+    ped.setCombatAttributes(17, true);
+    ped.setCombatAttributes(16, true);
+    ped.setBlockingOfNonTemporaryEvents(true);
+    ped.setProofs(false, false, false, true, false, false, false, false);
+    ped.setCanBeDamaged(true);
+    ped.setInvincible(true);
+    ped.setOnlyDamagedByPlayer(true);
+    ped.setCanRagdoll(true);
+    ped.setCanRagdollFromPlayerImpact(false);
+    ped.setRagdollFlag(0);
+    //this._ped.setRandomComponentVariation(false);
+    ped.applyDamagePack("BigHitByVehicle", 100, 1);
+    /*ped.applyDamagePack("Explosion_Med", 100, 1);
+    ped.applyDamagePack("Explosion_Large", 100, 1);
+    ped.applyDamagePack("SCR_Torture", 100, 1);
+    ped.applyDamagePack("SCR_Shark", 100, 1);
+    ped.applyDamagePack("BigRunOverByVehicle", 100, 1);*/
+    //mp.events.call("attachments:resync", ped);
+}
 var SyncWorld = new class {
     constructor() {
         this._syncedPeds = [];
@@ -10309,6 +10573,7 @@ class SyncPed {
         Destroys a Synced Ped clientside (drop syncer)
     */
     destroy() {
+        console.log("DROP SYNCER")
         if (this.ticker) {
             this.ticker.destroy();
         }
@@ -10316,6 +10581,10 @@ class SyncPed {
             this._renderEvent.destroy();
         }
     }
+    /*
+        Resync ped clothing attributes etc
+    */
+    resync() {}
     tick() {
         console.log("default tick");
     }
@@ -10327,14 +10596,13 @@ class SyncPed {
 class Zombie extends SyncPed {
     constructor(remoteId) {
         super(remoteId);
-        this.noiseAlertness = 2 / 3; // Noise level 4 on 3 meter distance
-        this.fieldOfView = 160;
-        this.viewDistance = 50;
+        this.noiseAlertness = this._ped.getVariable('NOISE_ALERTNESS') / 3; // Noise level 4 on 3 meter distance
+        this.viewDistance = this._ped.getVariable('VIEW_DISTANCE');
         this.meeleDistance = 1;
         this.zombieType = this._ped.getVariable('ZOMBIE_TYPE')
         this.walkStyle = this._ped.getVariable('WALKSTYLE')
-        this.pathfinder = new Pathfinder(this.fieldOfView, this.viewDistance, this.noiseAlertness, this.zombieType);
-        if (debug) {
+        this.pathfinder = new Pathfinder(this.viewDistance, this.noiseAlertness, this.zombieType);
+        if (mp.debug) {
             this.blip = mp.blips.new(9, new mp.Vector3(this._ped.position.x, this._ped.position.y, this._ped.position.z), {
                 color: 3,
                 scale: 0.1,
@@ -10350,11 +10618,21 @@ class Zombie extends SyncPed {
         });
     }
     /*
+        Resync ped clothing attributes etc
+    */
+    resync() {
+        console.log("resync")
+        this.loadPedAttributes();
+    }
+    /*
         Check if ped has abnormal status
     */
     status() {
+        if (!mp.peds.atRemoteId(this._remote_id)) return;
         if (this._ped.getVariable('DEAD')) this.flag = Flags.DEAD;
         if (this._ped.isRagdoll()) this.flag = Flags.RAGDOLL;
+        if (this._ped.isFalling()) this.flag = Flags.FALLING;
+        if ((this.flag == Flags.FALLING) && (!this._ped.isFalling())) this.flag = Flags.RAGDOLL;
         if ((this.flag == Flags.RAGDOLL) && (!this._ped.isRagdoll())) {
             this.flag = Flags.IDLE
             mp.peds.forEachInStreamRange((ped) => {
@@ -10374,19 +10652,27 @@ class Zombie extends SyncPed {
         Debug render info
     */
     render() {
+        if (!mp.debug) return;
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this.pathfinder.render();
         //this._ped.setHealth(200);
         let position = mp.vector(this._ped.getCoords(true)).ground();
         let dist = mp.vector(position).dist(mp.players.local.position);
         let threshold = this.noiseAlertness * dist
-        /*mp.game.graphics.drawText(`Zombie\nFlag:${this.flag}\nIdleTicks:${this.pathfinder.IdleTicks}\nDead:${this._ped.getVariable('DEAD') }\nTYPE:${this.zombieType}\nHEALTH:${this._ped.getVariable('HEALTH')}\nThreshold:${threshold.toFixed(2)}`, [position.x, position.y, position.z - 1], {
+        mp.game.graphics.drawText(`Syncer:${this._ped.controller ? this._ped.controller.name : "none"}`, [position.x, position.y, position.z + 2], {
             font: 4,
-            color: [255, 255, 255, 255],
-            scale: [0.2, 0.2],
+            color: [255, 255, 255, 200],
+            scale: [0.3, 0.3],
             outline: true,
             centre: true
-        });*/
+        });
+        mp.game.graphics.drawText(`Zombie\nFlag:${this.flag}\nTYPE:${this.zombieType}\nHEALTH:${this._ped.getVariable('HEALTH')}\nThreshold:${threshold.toFixed(2)}`, [position.x, position.y, position.z - 1], {
+            font: 4,
+            color: [255, 255, 255, 150],
+            scale: [0.3, 0.3],
+            outline: true,
+            centre: true
+        });
         let r = mp.lerp(200, 0, 1 / this._ped.getMaxHealth() * this._ped.getHealth());
         mp.game.graphics.drawMarker(25, position.x, position.y, position.z + 0.04, 0, 0, 0, 0, 0, 0, 1, 1, 1, r, 0, 0, 150, false, false, 2, false, "", "", false);
         if (this.currentTargetPosition) {
@@ -10398,38 +10684,10 @@ class Zombie extends SyncPed {
         Set ped attributes so it doesnt flee and cower
     */
     loadPedAttributes() {
-        this._ped.setMaxHealth(200);
-        this._ped.setHealth(200);
-        this._ped.setSweat(100);
-        this._ped.setSuffersCriticalHits(false);
-        this._ped.freezePosition(false);
-        this._ped.setCombatAbility(100);
-        this._ped.setCombatMovement(3);
-        for (var i = 1; i < 64; i += 2) {
-            this._ped.setFleeAttributes(i, false);
-        }
-        this._ped.setFleeAttributes(0, false);
-        this._ped.setCombatAttributes(17, true);
-        this._ped.setCombatAttributes(16, true);
-        this._ped.setBlockingOfNonTemporaryEvents(true);
-        this._ped.setProofs(false, false, false, true, false, false, false, false);
-        this._ped.setCanBeDamaged(true);
-        this._ped.setInvincible(true);
-        this._ped.setOnlyDamagedByPlayer(true);
-        this._ped.setCanRagdoll(true);
-        this._ped.setCanRagdollFromPlayerImpact(false);
-        this._ped.setRagdollFlag(0);
-        //this._ped.setRandomComponentVariation(false);
-        this._ped.applyDamagePack("BigHitByVehicle", 100, 1);
-        this._ped.applyDamagePack("Explosion_Med", 100, 1);
-        this._ped.applyDamagePack("Explosion_Large", 100, 1);
-        this._ped.applyDamagePack("SCR_Torture", 100, 1);
-        this._ped.applyDamagePack("SCR_Shark", 100, 1);
-        this._ped.applyDamagePack("BigRunOverByVehicle", 100, 1);
+        if (!mp.peds.atRemoteId(this._remote_id)) return;
+        applyZombieAttributes(this._ped);
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
         this._ped.setHealth((100 + this._ped.getVariable('HEALTH')));
-        let position = mp.vector(this._ped.getCoords(true))
-        this._ped.taskPlantBomb(position.x, position.y, position.z, this._ped.getHeading());
     }
     /*
         Apply hit to player (make it stumble and so on)
@@ -10465,6 +10723,7 @@ class Zombie extends SyncPed {
         Kill Ped
     */
     kill() {
+        if (!mp.peds.atRemoteId(this._remote_id)) return;
         this._ped.setHealth(0);
         this._ped.setToRagdoll(1000, 1000, 3, false, false, false);
         this.flag = Flags.DEAD;
@@ -10473,6 +10732,7 @@ class Zombie extends SyncPed {
         On Init (load walkstyle etc)
     */
     init() {
+        if (!mp.peds.atRemoteId(this._remote_id)) return false;
         if (!mp.game.streaming.hasClipSetLoaded(this.walkStyle)) {
             mp.game.streaming.requestClipSet(this.walkStyle);
             while (!mp.game.streaming.hasClipSetLoaded(this.walkStyle)) mp.game.wait(0);
@@ -10496,6 +10756,10 @@ class Zombie extends SyncPed {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 1, 0, false, 786603, 0);
         //this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 0.4, 15000, this.newHeading, 0);
+        if ((this.position.z > position.z + 2) || this.straight) {
+            this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 1.0, -1, this._ped.getHeading(), 2);
+        }
+
     }
     /*
        Run to position
@@ -10506,7 +10770,7 @@ class Zombie extends SyncPed {
         if (!position) return false;
         if (!this.position) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 6.2, 0, false, 786603, 0);
-        if (this.position.z > position.z + 2) {
+        if ((this.position.z > position.z + 2) || this.straight) {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 6.2, -1, this._ped.getHeading(), 2);
         }
     }
@@ -10519,7 +10783,7 @@ class Zombie extends SyncPed {
         if (!position) return false;
         if (!this.position) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 12.4, 0, false, 786603, 0);
-        if (this.position.z > position.z + 1) {
+        if ((this.position.z > position.z + 1) || this.straight) {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 12.4, -1, this._ped.getHeading(), 2);
         }
     }
@@ -10540,6 +10804,7 @@ class Zombie extends SyncPed {
     */
     combat(targetType, remoteId) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
+        this.straight = false;
         var tagetEntity = false;
         if (targetType == "player") {
             tagetEntity = mp.players.toArray().find(element => element.remoteId == remoteId);
@@ -10556,6 +10821,7 @@ class Zombie extends SyncPed {
                 this.meele(tagetEntity.handle);
                 return true;
             }
+            if (tagetEntity.type == "player" && tagetEntity.isOnVehicle()) this.straight = true;
             this.currentTargetPosition = tEntityPos;
             if (this.zombieType == "runner") this.run(tEntityPos);
             if (this.zombieType == "walker") this.walk(tEntityPos);
@@ -10567,11 +10833,15 @@ class Zombie extends SyncPed {
        
     */
     tick() {
-        if (!mp.peds.atRemoteId(this._remote_id)) return console.log("no remote", this._remote_id);
+        if (!mp.peds.atRemoteId(this._remote_id)) {
+            console.log("no remote", this._remote_id);
+            SyncWorld.reject("zombie", this._remote_id, true);
+            return;
+        }
         this.status();
         if (this.flag != Flags.DEAD) {
             this.position = this._ped.getCoords(false);
-            if (debug) {
+            if (mp.debug && this.blip) {
                 this.blip.setCoords(this.position);
             }
             this.pathfinder.update(this.flag, new mp.Vector3(this.position.x, this.position.y, this.position.z), this._ped.getHeading());
@@ -10629,6 +10899,18 @@ class Zombie extends SyncPed {
     }
 }
 /*
+    Called when ped controller changes to resync attributes
+*/
+mp.events.add('resyncPed', (type, remoteId) => {
+    console.log("resyncPed", remoteId);
+    let SyncedPed = SyncWorld.getByID(remoteId);
+    if (SyncedPed) {
+        SyncedPed.resync();
+    } else {
+        if (type == "zombie") applyZombieAttributes(mp.peds.atRemoteId(remoteId));
+    }
+});
+/*
     Called when a players gets the job to sync a Server-NPC
 */
 mp.events.add('acknowledgeSync', (type, remote_id) => {
@@ -10652,23 +10934,7 @@ mp.events.add('acknowledgeHit', (remote_id, hitData) => {
         SyncedPed.applyHit(hitData);
     }
 });
-/*
-    Test Decals
-*/
-mp.events.add("playerCommand", (command) => {
-    const args = command.split(/[ ]+/);
-    const commandName = args[0];
-    args.shift();
-    if (commandName === "d") {
-        mp.gui.chat.push(`Applying Damagepack [${args.join(",")}]`);
-        mp.players.local.applyDamagePack(args[0], 100, 1);
-    }
-    if (commandName === "c") {
-        mp.gui.chat.push(`Clearing Damagepacks`);
-        mp.players.local.clearBloodDamage();
-    }
-});
-},{"./libs/skeleton.js":5,"./natives.js":9,"./path.js":10}],12:[function(require,module,exports){
+},{"./libs/skeleton.js":8,"./natives.js":12,"./path.js":14}],16:[function(require,module,exports){
 
 
 /*
@@ -10898,10 +11164,8 @@ Array.prototype.shuffle = function() {
     }
     return this;
 }
-},{}],13:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 require("./vector.js");
-mp.game.audio.startAudioScene("FBI_HEIST_H5_MUTE_AMBIENCE_SCENE");
-mp.game.audio.startAudioScene("MIC1_RADIO_DISABLE");
 var Weather = new class {
     constructor() {
         this._areas = [];
@@ -10975,4 +11239,4 @@ var Weather = new class {
     }
 }
 module.exports = Weather;
-},{"./vector.js":12}]},{},[3]);
+},{"./vector.js":16}]},{},[4]);

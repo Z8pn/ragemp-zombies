@@ -1,15 +1,17 @@
-require("./libs/attachmentSync.js")
-require("./libs/weapon_attachments.js")
-var Bones = require("./libs/skeleton.js")
-require("./attachments.js")
 console.log = function(...a) {
     a = a.map(function(e) {
         return JSON.stringify(e);
     })
     mp.gui.chat.push("DeBuG:" + a.join(" "))
 };
+mp.debug = false;
+require("./libs/enums.js")
+require("./libs/attachmentSync.js")
+require("./libs/weapon_attachments.js")
+var Bones = require("./libs/skeleton.js")
+mp.camera = require("./libs/camera.js")
+require("./attachments.js")
 mp.nametags.enabled = true;
-
 /*
     Client Tickrate
 */
@@ -17,26 +19,6 @@ var tickRate = 1000 / 5;
 setInterval(function() {
     mp.events.call("client:Tick");
 }, tickRate);
-/*
-    enum Flags 
-*/
-let flags_count = 0;
-var flags = {
-    WALKING: flags_count++,
-    SPRINT: flags_count++,
-    RUNNING: flags_count++,
-    IDLE: flags_count++,
-    COMBAT: flags_count++,
-    RAGDOLL: flags_count++,
-    STUMBLE: flags_count++,
-    DEAD: flags_count++,
-    DEATH: flags_count++,
-}
-global["Flags"] = [];
-Object.keys(flags).forEach(function(key, value) {
-    console.log("enums-> Flags." + key, "=", flags[key])
-    global["Flags"][key] = flags[key];
-})
 /*
     mp.lerp for lerping numbers
 */
@@ -56,8 +38,8 @@ require("./sync.js")
 require("./combat.js")
 require("./movement.js")
 require("./weather.js")
-
-
+require("./generator.js")
+var Noise = require("./noise.js")
 /*
     Max out all stats
 */
@@ -65,28 +47,11 @@ var stats = ["SP0_STAMINA", "SP0_SHOOTING_ABILITY", "SP0_STRENGTH", "SP0_STEALTH
 stats.forEach((element) => {
     mp.game.stats.statSetInt(mp.game.joaat(element), 100, false);
 });
-/*
-    Update player Noise
-*/
-let oldNoise = 0;
-mp.events.add("client:Tick", () => {
-    let mul = mp.players.local.getVariable("isCrouched");
-    let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.8 : mp.game.player.getCurrentStealthNoise();
-    if (mp.players.local.isInAnyVehicle(false)) {
-        localNoise *= 2;
-        if (mp.players.local.vehicle.getIsEngineRunning()) {
-            localNoise += 15;
-        }
-    }
-    if (oldNoise != localNoise) {
-        oldNoise = localNoise;
-        mp.events.callRemote('client:noise', localNoise.toFixed(2));
-    }
-});
 var localPlayerBlip = mp.blips.new(9, new mp.Vector3(0, 0, 0), {
     color: 3,
     scale: 0.2,
     alpha: 100,
+    shortRange: true,
     drawDistance: 0
 });
 mp.events.add("render", () => {
@@ -94,15 +59,7 @@ mp.events.add("render", () => {
     //    mp.players.local.taskPlayAnim("move_crawl", "onfront_fwd", 8.0, 1.0, -1, 9, 0.0, false, false, false);
     //    mp.players.local.taskPlayAnim("move_crawl", "onfront_fwd", 8.0, 1.0, -1, 43, 0.0, false, false, false);
     //}
-
-
     //mp.players.local.taskAimGunScripted(mp.game.gameplay.getHashKey("SCRIPTED_GUN_TASK_PLANE_WING"), true, true);
-
-
-
-
-
-
     let mul = mp.players.local.getVariable("isCrouched");
     let localNoise = mul ? mp.game.player.getCurrentStealthNoise() * 0.8 : mp.game.player.getCurrentStealthNoise();
     if (mp.players.local.isInAnyVehicle(false)) {
@@ -142,4 +99,17 @@ mp.keys.bind(0x72, true, function() {
 });
 mp.keys.bind(0x73, true, function() {
     mp.events.callRemote('zombie_new', "sprinter");
+});
+
+/*
+    Test Decals
+*/
+mp.events.add("playerCommand", (command) => {
+    const args = command.split(/[ ]+/);
+    const commandName = args[0];
+    args.shift();
+    if (commandName === "debug") {
+        mp.gui.chat.push(`changing Debug mode`);
+        mp.debug = !mp.debug ;
+    }
 });

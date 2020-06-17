@@ -47,8 +47,7 @@ class Node {
     Pathfinder class for Zombies
 */
 var Pathfinder = class {
-    constructor(fov, viewDistance, noiseAlertness, zombieType) {
-        this.fov = fov;
+    constructor(viewDistance, noiseAlertness, zombieType) {
         this.viewDistance = viewDistance;
         this.noiseAlertness = noiseAlertness;
         this.vision = [];
@@ -211,6 +210,9 @@ var Pathfinder = class {
         }
         if (this.flag == Flags.RAGDOLL) {
             temp_action.flag = Flags.RAGDOLL;
+        }
+        if (this.flag == Flags.FALLING) {
+            temp_action.flag = Flags.FALLING;
         }
         this.nextAction = temp_action;
     }

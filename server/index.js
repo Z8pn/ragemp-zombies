@@ -1,11 +1,23 @@
+require("./models/debug.js")
 require("./libs/attachments.js")
 var PlayerAccount = require("./models/player.js")
+
+var tickRate = 1000 / 5;
+setInterval(function() {
+    mp.events.call("server:Tick");
+}, tickRate);
+
+
+
+
+
 
 var Peds = require("./models/peds.js")
 mp.events.add("playerDeath", (player) => {
     player.data.isCrouched = false;
 });
 mp.events.add("toggleCrouch", (player) => {
+    console.log("player.packetLoss",player.packetLoss);
     if (player.data.isCrouched === undefined) {
         player.data.isCrouched = true;
     } else {

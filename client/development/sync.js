@@ -1,5 +1,4 @@
 var Bones = require("./libs/skeleton.js")
-var debug = true
 var Pathfinder = require("./path.js");
 var natives = require("./natives.js");
 const loadClipSet = (clipSetName) => {
@@ -7,6 +6,40 @@ const loadClipSet = (clipSetName) => {
     while (!mp.game.streaming.hasClipSetLoaded(clipSetName)) mp.game.wait(0);
 };
 loadClipSet("move_m@drunk@verydrunk");
+
+function applyZombieAttributes(ped) {
+    if (!ped) return;
+    console.log("applyZombieAttributes")
+    ped.setMaxHealth(200);
+    ped.setHealth(200);
+    ped.setSweat(100);
+    ped.setSuffersCriticalHits(false);
+    ped.freezePosition(false);
+    ped.setCombatAbility(100);
+    ped.setCombatMovement(3);
+    for (var i = 1; i < 64; i += 2) {
+        ped.setFleeAttributes(i, false);
+    }
+    ped.setFleeAttributes(0, false);
+    ped.setCombatAttributes(17, true);
+    ped.setCombatAttributes(16, true);
+    ped.setBlockingOfNonTemporaryEvents(true);
+    ped.setProofs(false, false, false, true, false, false, false, false);
+    ped.setCanBeDamaged(true);
+    ped.setInvincible(true);
+    ped.setOnlyDamagedByPlayer(true);
+    ped.setCanRagdoll(true);
+    ped.setCanRagdollFromPlayerImpact(false);
+    ped.setRagdollFlag(0);
+    //this._ped.setRandomComponentVariation(false);
+    ped.applyDamagePack("BigHitByVehicle", 100, 1);
+    /*ped.applyDamagePack("Explosion_Med", 100, 1);
+    ped.applyDamagePack("Explosion_Large", 100, 1);
+    ped.applyDamagePack("SCR_Torture", 100, 1);
+    ped.applyDamagePack("SCR_Shark", 100, 1);
+    ped.applyDamagePack("BigRunOverByVehicle", 100, 1);*/
+    //mp.events.call("attachments:resync", ped);
+}
 var SyncWorld = new class {
     constructor() {
         this._syncedPeds = [];
@@ -55,6 +88,7 @@ class SyncPed {
         Destroys a Synced Ped clientside (drop syncer)
     */
     destroy() {
+        console.log("DROP SYNCER")
         if (this.ticker) {
             this.ticker.destroy();
         }
@@ -62,6 +96,10 @@ class SyncPed {
             this._renderEvent.destroy();
         }
     }
+    /*
+        Resync ped clothing attributes etc
+    */
+    resync() {}
     tick() {
         console.log("default tick");
     }
@@ -73,14 +111,13 @@ class SyncPed {
 class Zombie extends SyncPed {
     constructor(remoteId) {
         super(remoteId);
-        this.noiseAlertness = 2 / 3; // Noise level 4 on 3 meter distance
-        this.fieldOfView = 160;
-        this.viewDistance = 50;
+        this.noiseAlertness = this._ped.getVariable('NOISE_ALERTNESS') / 3; // Noise level 4 on 3 meter distance
+        this.viewDistance = this._ped.getVariable('VIEW_DISTANCE');
         this.meeleDistance = 1;
         this.zombieType = this._ped.getVariable('ZOMBIE_TYPE')
         this.walkStyle = this._ped.getVariable('WALKSTYLE')
-        this.pathfinder = new Pathfinder(this.fieldOfView, this.viewDistance, this.noiseAlertness, this.zombieType);
-        if (debug) {
+        this.pathfinder = new Pathfinder(this.viewDistance, this.noiseAlertness, this.zombieType);
+        if (mp.debug) {
             this.blip = mp.blips.new(9, new mp.Vector3(this._ped.position.x, this._ped.position.y, this._ped.position.z), {
                 color: 3,
                 scale: 0.1,
@@ -96,11 +133,21 @@ class Zombie extends SyncPed {
         });
     }
     /*
+        Resync ped clothing attributes etc
+    */
+    resync() {
+        console.log("resync")
+        this.loadPedAttributes();
+    }
+    /*
         Check if ped has abnormal status
     */
     status() {
+        if (!mp.peds.atRemoteId(this._remote_id)) return;
         if (this._ped.getVariable('DEAD')) this.flag = Flags.DEAD;
         if (this._ped.isRagdoll()) this.flag = Flags.RAGDOLL;
+        if (this._ped.isFalling()) this.flag = Flags.FALLING;
+        if ((this.flag == Flags.FALLING) && (!this._ped.isFalling())) this.flag = Flags.RAGDOLL;
         if ((this.flag == Flags.RAGDOLL) && (!this._ped.isRagdoll())) {
             this.flag = Flags.IDLE
             mp.peds.forEachInStreamRange((ped) => {
@@ -120,19 +167,27 @@ class Zombie extends SyncPed {
         Debug render info
     */
     render() {
+        if (!mp.debug) return;
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this.pathfinder.render();
         //this._ped.setHealth(200);
         let position = mp.vector(this._ped.getCoords(true)).ground();
         let dist = mp.vector(position).dist(mp.players.local.position);
         let threshold = this.noiseAlertness * dist
-        /*mp.game.graphics.drawText(`Zombie\nFlag:${this.flag}\nIdleTicks:${this.pathfinder.IdleTicks}\nDead:${this._ped.getVariable('DEAD') }\nTYPE:${this.zombieType}\nHEALTH:${this._ped.getVariable('HEALTH')}\nThreshold:${threshold.toFixed(2)}`, [position.x, position.y, position.z - 1], {
+        mp.game.graphics.drawText(`Syncer:${this._ped.controller ? this._ped.controller.name : "none"}`, [position.x, position.y, position.z + 2], {
             font: 4,
-            color: [255, 255, 255, 255],
-            scale: [0.2, 0.2],
+            color: [255, 255, 255, 200],
+            scale: [0.3, 0.3],
             outline: true,
             centre: true
-        });*/
+        });
+        mp.game.graphics.drawText(`Zombie\nFlag:${this.flag}\nTYPE:${this.zombieType}\nHEALTH:${this._ped.getVariable('HEALTH')}\nThreshold:${threshold.toFixed(2)}`, [position.x, position.y, position.z - 1], {
+            font: 4,
+            color: [255, 255, 255, 150],
+            scale: [0.3, 0.3],
+            outline: true,
+            centre: true
+        });
         let r = mp.lerp(200, 0, 1 / this._ped.getMaxHealth() * this._ped.getHealth());
         mp.game.graphics.drawMarker(25, position.x, position.y, position.z + 0.04, 0, 0, 0, 0, 0, 0, 1, 1, 1, r, 0, 0, 150, false, false, 2, false, "", "", false);
         if (this.currentTargetPosition) {
@@ -144,38 +199,10 @@ class Zombie extends SyncPed {
         Set ped attributes so it doesnt flee and cower
     */
     loadPedAttributes() {
-        this._ped.setMaxHealth(200);
-        this._ped.setHealth(200);
-        this._ped.setSweat(100);
-        this._ped.setSuffersCriticalHits(false);
-        this._ped.freezePosition(false);
-        this._ped.setCombatAbility(100);
-        this._ped.setCombatMovement(3);
-        for (var i = 1; i < 64; i += 2) {
-            this._ped.setFleeAttributes(i, false);
-        }
-        this._ped.setFleeAttributes(0, false);
-        this._ped.setCombatAttributes(17, true);
-        this._ped.setCombatAttributes(16, true);
-        this._ped.setBlockingOfNonTemporaryEvents(true);
-        this._ped.setProofs(false, false, false, true, false, false, false, false);
-        this._ped.setCanBeDamaged(true);
-        this._ped.setInvincible(true);
-        this._ped.setOnlyDamagedByPlayer(true);
-        this._ped.setCanRagdoll(true);
-        this._ped.setCanRagdollFromPlayerImpact(false);
-        this._ped.setRagdollFlag(0);
-        //this._ped.setRandomComponentVariation(false);
-        this._ped.applyDamagePack("BigHitByVehicle", 100, 1);
-        this._ped.applyDamagePack("Explosion_Med", 100, 1);
-        this._ped.applyDamagePack("Explosion_Large", 100, 1);
-        this._ped.applyDamagePack("SCR_Torture", 100, 1);
-        this._ped.applyDamagePack("SCR_Shark", 100, 1);
-        this._ped.applyDamagePack("BigRunOverByVehicle", 100, 1);
+        if (!mp.peds.atRemoteId(this._remote_id)) return;
+        applyZombieAttributes(this._ped);
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
         this._ped.setHealth((100 + this._ped.getVariable('HEALTH')));
-        let position = mp.vector(this._ped.getCoords(true))
-        this._ped.taskPlantBomb(position.x, position.y, position.z, this._ped.getHeading());
     }
     /*
         Apply hit to player (make it stumble and so on)
@@ -211,6 +238,7 @@ class Zombie extends SyncPed {
         Kill Ped
     */
     kill() {
+        if (!mp.peds.atRemoteId(this._remote_id)) return;
         this._ped.setHealth(0);
         this._ped.setToRagdoll(1000, 1000, 3, false, false, false);
         this.flag = Flags.DEAD;
@@ -219,6 +247,7 @@ class Zombie extends SyncPed {
         On Init (load walkstyle etc)
     */
     init() {
+        if (!mp.peds.atRemoteId(this._remote_id)) return false;
         if (!mp.game.streaming.hasClipSetLoaded(this.walkStyle)) {
             mp.game.streaming.requestClipSet(this.walkStyle);
             while (!mp.game.streaming.hasClipSetLoaded(this.walkStyle)) mp.game.wait(0);
@@ -242,6 +271,10 @@ class Zombie extends SyncPed {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 1, 0, false, 786603, 0);
         //this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 0.4, 15000, this.newHeading, 0);
+        if ((this.position.z > position.z + 2) || this.straight) {
+            this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 1.0, -1, this._ped.getHeading(), 2);
+        }
+
     }
     /*
        Run to position
@@ -252,7 +285,7 @@ class Zombie extends SyncPed {
         if (!position) return false;
         if (!this.position) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 6.2, 0, false, 786603, 0);
-        if (this.position.z > position.z + 2) {
+        if ((this.position.z > position.z + 2) || this.straight) {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 6.2, -1, this._ped.getHeading(), 2);
         }
     }
@@ -265,7 +298,7 @@ class Zombie extends SyncPed {
         if (!position) return false;
         if (!this.position) return false;
         this._ped.taskGoToCoordAnyMeans(position.x, position.y, position.z, 12.4, 0, false, 786603, 0);
-        if (this.position.z > position.z + 1) {
+        if ((this.position.z > position.z + 1) || this.straight) {
             this._ped.taskGoStraightToCoord(position.x, position.y, position.z, 12.4, -1, this._ped.getHeading(), 2);
         }
     }
@@ -286,6 +319,7 @@ class Zombie extends SyncPed {
     */
     combat(targetType, remoteId) {
         if (!mp.peds.atRemoteId(this._remote_id)) return false;
+        this.straight = false;
         var tagetEntity = false;
         if (targetType == "player") {
             tagetEntity = mp.players.toArray().find(element => element.remoteId == remoteId);
@@ -302,6 +336,7 @@ class Zombie extends SyncPed {
                 this.meele(tagetEntity.handle);
                 return true;
             }
+            if (tagetEntity.type == "player" && tagetEntity.isOnVehicle()) this.straight = true;
             this.currentTargetPosition = tEntityPos;
             if (this.zombieType == "runner") this.run(tEntityPos);
             if (this.zombieType == "walker") this.walk(tEntityPos);
@@ -313,11 +348,15 @@ class Zombie extends SyncPed {
        
     */
     tick() {
-        if (!mp.peds.atRemoteId(this._remote_id)) return console.log("no remote", this._remote_id);
+        if (!mp.peds.atRemoteId(this._remote_id)) {
+            console.log("no remote", this._remote_id);
+            SyncWorld.reject("zombie", this._remote_id, true);
+            return;
+        }
         this.status();
         if (this.flag != Flags.DEAD) {
             this.position = this._ped.getCoords(false);
-            if (debug) {
+            if (mp.debug && this.blip) {
                 this.blip.setCoords(this.position);
             }
             this.pathfinder.update(this.flag, new mp.Vector3(this.position.x, this.position.y, this.position.z), this._ped.getHeading());
@@ -375,6 +414,18 @@ class Zombie extends SyncPed {
     }
 }
 /*
+    Called when ped controller changes to resync attributes
+*/
+mp.events.add('resyncPed', (type, remoteId) => {
+    console.log("resyncPed", remoteId);
+    let SyncedPed = SyncWorld.getByID(remoteId);
+    if (SyncedPed) {
+        SyncedPed.resync();
+    } else {
+        if (type == "zombie") applyZombieAttributes(mp.peds.atRemoteId(remoteId));
+    }
+});
+/*
     Called when a players gets the job to sync a Server-NPC
 */
 mp.events.add('acknowledgeSync', (type, remote_id) => {
@@ -396,21 +447,5 @@ mp.events.add('acknowledgeHit', (remote_id, hitData) => {
     let SyncedPed = SyncWorld.getByID(remote_id);
     if (SyncedPed) {
         SyncedPed.applyHit(hitData);
-    }
-});
-/*
-    Test Decals
-*/
-mp.events.add("playerCommand", (command) => {
-    const args = command.split(/[ ]+/);
-    const commandName = args[0];
-    args.shift();
-    if (commandName === "d") {
-        mp.gui.chat.push(`Applying Damagepack [${args.join(",")}]`);
-        mp.players.local.applyDamagePack(args[0], 100, 1);
-    }
-    if (commandName === "c") {
-        mp.gui.chat.push(`Clearing Damagepacks`);
-        mp.players.local.clearBloodDamage();
     }
 });
