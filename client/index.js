@@ -190,7 +190,7 @@ mp.events.add('playerWeaponShot', (targetPosition, targetEntity) => {
 });
 
 /*
-    Hitmarker
+    Hitmarker 
 */
 var timerHitmarker = 0;
 var timerHitmarkerKill = 0;
