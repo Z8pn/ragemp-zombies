@@ -4,17 +4,13 @@ const vector = require("../libs/vector.js");
 //let style = "move_ped_crouched"; // crouched
 //let style = "move_m@drunk@verydrunk";
 //var walkstyle_to_set = "move_m@generic";
-
 var walkstyle_to_set = "move_m@drunk@moderatedrunk";
 mp.events.addCommand("w", (player, cmd, walkstyle) => {
     console.log("Walkstyle Set To", walkstyle);
     walkstyle_to_set = walkstyle;
 });
 mp.events.add("zombie_new", (player, type) => {
-
-
-    let new_pos = vector(player.position).findRot(0,2,player.heading);
-
+    let new_pos = vector(player.position).findRot(0, 2, player.heading);
     let dynamicPed = mp.peds.new(mp.joaat('mp_m_freemode_01'), new_pos, {
         dynamic: true,
         frozen: false,
@@ -22,13 +18,14 @@ mp.events.add("zombie_new", (player, type) => {
     });
     dynamicPed.setVariable("zombie", true);
     dynamicPed.setVariable("sync_id", dynamicPed.id);
-    let max_hp = 40;
-    if (type == "runner") max_hp = 20;;
-    if (type == "sprinter") max_hp = 10;;
+    let max_hp = 70;
+    if (type == "runner") max_hp = 50;;
+    if (type == "sprinter") max_hp = 40;
     dynamicPed.setVariable("HEALTH", max_hp);
     dynamicPed.setVariable("MAX_HEALTH", max_hp);
     dynamicPed.setVariable("DEAD", false);
     dynamicPed.setVariable("ZOMBIE_TYPE", type);
+    dynamicPed.setVariable("CAN_STUMBLE", true);
     dynamicPed.setVariable("WALKSTYLE", "move_m@drunk@verydrunk");
     if (type == "runner") dynamicPed.setVariable("WALKSTYLE", "move_m@drunk@moderatedrunk");
     if (type == "sprinter") dynamicPed.setVariable("WALKSTYLE", "move_m@generic");
@@ -37,6 +34,15 @@ mp.events.add("zombie_new", (player, type) => {
     console.log("dynamicPed.model", dynamicPed.model);
     console.log("dynamicPed.id", dynamicPed.id);
     player.call("acknowledgeSync", ["zombie", dynamicPed.id]);
+    mp.events.call("ped:create", dynamicPed);
+    let r = Math.floor(Math.random() * 100) + 1;
+    if (r > 50) {
+        dynamicPed.setVariable("CAN_STUMBLE", false);
+        if (r > 75) dynamicPed.addAttachment("pot_head", true);
+        if (r <= 75) dynamicPed.addAttachment("bucket_head", true);
+    }
+    //dynamicPed.addAttachment("pot_head", true);
+    //dynamicPed.addAttachment("knife_clavicle", true);
 });
 mp.events.add("zombie:damage", (player, zombieId, weapon_hash, hitBone, fireFromVector, hitVector) => {
     console.log("zombie:damage", zombieId, weapon_hash, hitBone, fireFromVector, hitVector);
@@ -47,10 +53,15 @@ mp.events.add("zombie:damage", (player, zombieId, weapon_hash, hitBone, fireFrom
         zombie.setVariable("HEALTH", zombie.getVariable('HEALTH') - 5);
         console.log("acknowledgeHit")
         let ragdoll = false;
-        let stumble = true;
+        let stumble = false;
         if (hitBone == "SKEL_Head") {
             ragdoll = true;
-            stumble = false;
+        }
+        if (!zombie.getVariable('CAN_STUMBLE')) ragdoll = false;
+        if (!zombie.getVariable('CAN_STUMBLE')) stumble = false;
+        if (
+            (hitBone == "SKEL_L_Thigh") || (hitBone == "SKEL_R_Thigh") || (hitBone == "SKEL_L_Foot") || (hitBone == "SKEL_R_Foot") || (hitBone == "SKEL_L_Calf") || (hitBone == "SKEL_R_Calf")) {
+            stumble = true;
         }
         syncingPlayer.call("acknowledgeHit", [zombieId, {
             wepaon: weapon_hash,
