@@ -25,9 +25,9 @@ class SyncPed {
         this._ped.setVariable("sync_id", this._ped.id);
         this._ped.setVariable("syncPed", true);
         this._ped.setVariable("DEAD", false);
-        this.corpse = false;
         this.deathtime = 0;
         this.manager = PedManager;
+        this._corpseTime = 15 * 60 * 1000;
     }
     get ped() {
         if (!mp.peds.at(this.id)) return false
@@ -36,7 +36,7 @@ class SyncPed {
     }
     get deletable() {
         if (!mp.peds.at(this.id)) return false
-        return this.ped.getVariable("DEAD");
+        return this.ped.getVariable("DEAD") && (this.deathtime + this._corpseTime < Date.now());
     }
     kill() {
         this.deathtime = Date.now();
@@ -49,7 +49,7 @@ class SyncPed {
         if (!player) return;
         this._ped.controller = null;
         this.controllerId = -1;
-        player.call("rejectSync", [this._type, this.id, false]);
+        player.call("rejectSync", [this._type, this.id, this.ped.getVariable("DEAD")]);
     }
     get controller() {
         if (!mp.peds.at(this.id)) return false
@@ -80,11 +80,6 @@ class Zombie extends SyncPed {
         this.zombieType = zombieType;
         this.init();
         this._type = "zombie";
-        let r = Math.floor(Math.random() * 100) + 1;
-        if (r > 50) {
-          //  if (r > 75) this._ped.addAttachment("pot_head", true);
-            //if (r <= 75) this._ped.addAttachment("bucket_head", true);
-        }
     }
     init() {
         this.manager = ZombieManager;

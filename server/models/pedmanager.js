@@ -11,7 +11,7 @@ class PedManager {
     }
     tick() {
         this._pedPool.forEach(syncPed => {
-            if (syncPed.deletable && ((syncPed.deathtime + this._corpseTimeout) < Date.now())) return this.removePed(syncPed);
+            if (syncPed.deletable) return this.removePed(syncPed);
             let position = syncPed.position;
             let nearest_pos = 9999;
             let old_packagelost = 9999;
@@ -32,9 +32,6 @@ class PedManager {
                 if (syncPed.controller != best_syncer) {
                     syncPed.setController(best_syncer.id);
                     console.log("best syncer for", syncPed.id, "is", best_syncer.name);
-                    nearby_players.forEach(e => {
-                        e.call("resyncPed", [syncPed.type, syncPed.id]);
-                    })
                 }
             } else {
                 if (syncPed.controller) {
