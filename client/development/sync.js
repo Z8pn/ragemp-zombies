@@ -200,7 +200,29 @@ class Zombie extends SyncPed {
     */
     loadPedAttributes() {
         if (!mp.peds.atRemoteId(this._remote_id)) return;
-        applyZombieAttributes(this._ped);
+        this._ped.setMaxHealth(200);
+        this._ped.setHealth(200);
+        this._ped.setSweat(100);
+        this._ped.setSuffersCriticalHits(false);
+        this._ped.freezePosition(false);
+        this._ped.setCombatAbility(100);
+        this._ped.setCombatMovement(3);
+        for (var i = 1; i < 64; i += 2) {
+            this._ped.setFleeAttributes(i, false);
+        }
+        this._ped.setFleeAttributes(0, false);
+        this._ped.setCombatAttributes(17, true);
+        this._ped.setCombatAttributes(16, true);
+        this._ped.setBlockingOfNonTemporaryEvents(true);
+        this._ped.setProofs(false, false, false, true, false, false, false, false);
+        this._ped.setCanBeDamaged(true);
+        this._ped.setInvincible(true);
+        this._ped.setOnlyDamagedByPlayer(true);
+        this._ped.setCanRagdoll(true);
+        this._ped.setCanRagdollFromPlayerImpact(false);
+        this._ped.setRagdollFlag(0);
+        //this._ped.setRandomComponentVariation(false);
+        this._ped.applyDamagePack("BigHitByVehicle", 100, 1);
         this._ped.setMaxHealth((100 + this._ped.getVariable('MAX_HEALTH')));
         this._ped.setHealth((100 + this._ped.getVariable('HEALTH')));
     }
