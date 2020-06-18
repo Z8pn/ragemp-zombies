@@ -4,9 +4,12 @@ mp.attachmentMngr = {
         if (this.attachments.hasOwnProperty(id)) {
             if (!entity.__attachmentObjects.hasOwnProperty(id)) {
                 let attInfo = this.attachments[id];
-                let object = mp.objects.new(attInfo.model, entity.position);
-                object.attachTo(entity.handle, (typeof(attInfo.boneName) === 'string') ? entity.getBoneIndexByName(attInfo.boneName) : entity.getBoneIndex(attInfo.boneName), attInfo.offset.x, attInfo.offset.y, attInfo.offset.z, attInfo.rotation.x, attInfo.rotation.y, attInfo.rotation.z, false, false, false, false, 2, true);
-                entity.__attachmentObjects[id] = object;
+                mp.game.streaming.requestModel(mp.game.joaat(attInfo.model));
+                if (mp.game.streaming.hasModelLoaded(mp.game.joaat(attInfo.model))) {
+                    let object = mp.objects.new(attInfo.model, entity.position);
+                    object.attachTo(entity.handle, (typeof(attInfo.boneName) === 'string') ? entity.getBoneIndexByName(attInfo.boneName) : entity.getBoneIndex(attInfo.boneName), attInfo.offset.x, attInfo.offset.y, attInfo.offset.z, attInfo.rotation.x, attInfo.rotation.y, attInfo.rotation.z, false, false, false, false, 2, true);
+                    entity.__attachmentObjects[id] = object;
+                }
             }
         } else {
             mp.game.graphics.notify(`Static Attachments Error: ~r~Unknown Attachment Used: ~w~0x${id.toString(16)}`);
